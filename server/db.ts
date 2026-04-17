@@ -5,7 +5,8 @@ import {
   anamnesisSessions, anamnesisResponses, prescriptions, prescriptionComponents,
   dailyReports, prescriptionReports, alerts, alertRules, followUpSessions,
   exams, auditLog, scoringWeights, scoringBands, motorActions, clinicalFlags,
-  funnelStatus, medications, flowConfig
+  funnelStatus, medications, flowConfig, clinicalSystems, sleepDetails,
+  physicalActivityDetails, polypharmacyRules, teamQueue, protocolDocuments
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -418,4 +419,121 @@ export async function getDashboardStats(userId: number) {
     totalMedications: medicationCount?.count ?? 0,
     funnelStats,
   };
+}
+
+// ─── CLINICAL SYSTEMS HELPERS ────────────────────────────────
+export async function listClinicalSystems(patientId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(clinicalSystems).where(eq(clinicalSystems.patientId, patientId)).orderBy(asc(clinicalSystems.system));
+}
+export async function createClinicalSystem(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(clinicalSystems).values(data);
+  return r[0].insertId;
+}
+export async function updateClinicalSystem(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(clinicalSystems).set(data).where(eq(clinicalSystems.id, id));
+}
+export async function deleteClinicalSystem(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(clinicalSystems).where(eq(clinicalSystems.id, id));
+}
+
+// ─── SLEEP DETAIL HELPERS ────────────────────────────────────
+export async function listSleepDetails(patientId: number, limit = 30) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(sleepDetails).where(eq(sleepDetails.patientId, patientId)).orderBy(desc(sleepDetails.createdAt)).limit(limit);
+}
+export async function createSleepDetail(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(sleepDetails).values(data);
+  return r[0].insertId;
+}
+
+// ─── PHYSICAL ACTIVITY DETAIL HELPERS ────────────────────────
+export async function listPhysicalActivityDetails(patientId: number, limit = 30) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(physicalActivityDetails).where(eq(physicalActivityDetails.patientId, patientId)).orderBy(desc(physicalActivityDetails.createdAt)).limit(limit);
+}
+export async function createPhysicalActivityDetail(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(physicalActivityDetails).values(data);
+  return r[0].insertId;
+}
+
+// ─── POLYPHARMACY RULES HELPERS ──────────────────────────────
+export async function listPolypharmacyRules() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(polypharmacyRules).where(eq(polypharmacyRules.isActive, true));
+}
+export async function createPolypharmacyRule(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(polypharmacyRules).values(data);
+  return r[0].insertId;
+}
+export async function updatePolypharmacyRule(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(polypharmacyRules).set(data).where(eq(polypharmacyRules.id, id));
+}
+
+export async function checkPolypharmacy(patientId: number) {
+  const db = await getDb(); if (!db) return { alerts: [], totalMeds: 0 };
+  const meds = await db.select().from(medications).where(and(eq(medications.patientId, patientId), eq(medications.isActive, true)));
+  const rules = await listPolypharmacyRules();
+  const result: { type: string; description: string; severity: string }[] = [];
+  
+  // Check threshold rules
+  const thresholdRules = rules.filter(r => r.interactionType === 'limiar_polifarmacia' && r.threshold);
+  for (const rule of thresholdRules) {
+    if (meds.length >= (rule.threshold ?? 999)) {
+      result.push({ type: 'limiar_polifarmacia', description: rule.description, severity: (rule.threshold ?? 0) >= 10 ? 'grave' : 'moderado' });
+    }
+  }
+  
+  // Check interaction rules
+  const interactionRules = rules.filter(r => r.interactionType !== 'limiar_polifarmacia');
+  const medNames = meds.map(m => m.name.toLowerCase());
+  for (const rule of interactionRules) {
+    const hasA = medNames.some(n => n.includes(rule.medicationA.toLowerCase()));
+    const hasB = rule.medicationB ? medNames.some(n => n.includes(rule.medicationB!.toLowerCase())) : false;
+    if (hasA && hasB) {
+      result.push({ type: rule.interactionType, description: rule.description, severity: rule.interactionType === 'contraindicacao' ? 'grave' : 'moderado' });
+    }
+  }
+  
+  return { alerts: result, totalMeds: meds.length };
+}
+
+// ─── TEAM QUEUE HELPERS ──────────────────────────────────────
+export async function listTeamQueue(profile?: string) {
+  const db = await getDb(); if (!db) return [];
+  if (profile && profile !== 'todos') {
+    return db.select().from(teamQueue).where(eq(teamQueue.assignedProfile, profile as any)).orderBy(desc(teamQueue.createdAt));
+  }
+  return db.select().from(teamQueue).orderBy(desc(teamQueue.createdAt));
+}
+export async function createTeamQueueItem(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(teamQueue).values(data);
+  return r[0].insertId;
+}
+export async function updateTeamQueueItem(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(teamQueue).set(data).where(eq(teamQueue.id, id));
+}
+
+// ─── PROTOCOL DOCUMENT HELPERS ───────────────────────────────
+export async function listProtocolDocuments(patientId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(protocolDocuments).where(eq(protocolDocuments.patientId, patientId)).orderBy(desc(protocolDocuments.createdAt));
+}
+export async function createProtocolDocument(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(protocolDocuments).values(data);
+  return r[0].insertId;
+}
+export async function updateProtocolDocument(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(protocolDocuments).set(data).where(eq(protocolDocuments.id, id));
 }

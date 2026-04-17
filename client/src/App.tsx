@@ -29,6 +29,10 @@ const ConsultorasPage = lazy(() => import("./pages/Consultoras"));
 const PerguntasPage = lazy(() => import("./pages/Perguntas"));
 const AuditoriaPage = lazy(() => import("./pages/Auditoria"));
 const PatientPortal = lazy(() => import("./pages/PatientPortal"));
+const SistemasClinico = lazy(() => import("./pages/SistemasClinico"));
+const FilaEquipe = lazy(() => import("./pages/FilaEquipe"));
+const Polifarmacia = lazy(() => import("./pages/Polifarmacia"));
+const Protocolos = lazy(() => import("./pages/Protocolos"));
 
 function PageLoader() {
   return (
@@ -62,6 +66,10 @@ function DashboardRouter() {
           <Route path="/consultoras" component={ConsultorasPage} />
           <Route path="/perguntas" component={PerguntasPage} />
           <Route path="/auditoria" component={AuditoriaPage} />
+          <Route path="/sistemas-clinico" component={SistemasClinico} />
+          <Route path="/fila-equipe" component={FilaEquipe} />
+          <Route path="/polifarmacia" component={Polifarmacia} />
+          <Route path="/protocolos" component={Protocolos} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

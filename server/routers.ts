@@ -459,6 +459,71 @@ const funnelRouter = router({
     const { patientId, ...data } = input;
     await db.upsertFunnelStatus(patientId, data);
   }),
+  // Backend: detect abandoned patients (started anamnesis but no session completed in X days)
+  detectAbandonment: protectedProcedure.input(z.object({ daysThreshold: z.number().optional() })).query(async ({ input }) => {
+    const threshold = input.daysThreshold ?? 7;
+    const allPatients = await db.listPatients();
+    const abandoned: any[] = [];
+    for (const p of allPatients) {
+      const sessions = await db.listSessions(p.id);
+      if (sessions.length === 0) continue;
+      const lastSession = sessions[0];
+      if (lastSession.status !== "concluida") {
+        const lastDate = new Date(lastSession.createdAt);
+        const daysSince = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSince >= threshold) {
+          abandoned.push({
+            patientId: p.id, patientName: p.name, phone: p.phone, email: p.email,
+            lastSessionDate: lastSession.createdAt, daysSinceActivity: daysSince,
+            stoppedAtCategory: lastSession.category,
+          });
+        }
+      }
+    }
+    return abandoned;
+  }),
+  // Backend: classify high-interest patients (completed clinical + financial + high score)
+  classifyHighInterest: protectedProcedure.query(async () => {
+    const allFunnel = await db.listFunnelStats();
+    const allPatients = await db.listPatients();
+    const highInterest: any[] = [];
+    for (const p of allPatients) {
+      const funnel = await db.getFunnelStatus(p.id);
+      if (!funnel) continue;
+      const isHigh = (funnel.stage === "concluiu_financeiro" || funnel.stage === "alto_interesse") && (funnel.score ?? 0) >= 50;
+      if (isHigh) {
+        highInterest.push({
+          patientId: p.id, patientName: p.name, phone: p.phone,
+          score: funnel.score, scoreBand: funnel.scoreBand, stage: funnel.stage,
+        });
+      }
+    }
+    return highInterest;
+  }),
+  // Backend: commercial forecast by band (deterministic from real data)
+  commercialForecast: protectedProcedure.query(async () => {
+    const allPatients = await db.listPatients();
+    const bandCounts: Record<string, { count: number; patients: string[] }> = {
+      "B\u00e1sico": { count: 0, patients: [] }, "Intermedi\u00e1rio": { count: 0, patients: [] },
+      "Avan\u00e7ado": { count: 0, patients: [] }, "Full": { count: 0, patients: [] },
+    };
+    for (const p of allPatients) {
+      const funnel = await db.getFunnelStatus(p.id);
+      if (funnel?.scoreBand && bandCounts[funnel.scoreBand]) {
+        bandCounts[funnel.scoreBand].count++;
+        bandCounts[funnel.scoreBand].patients.push(p.name);
+      }
+    }
+    const priceRanges: Record<string, { min: number; max: number }> = {
+      "B\u00e1sico": { min: 500, max: 800 }, "Intermedi\u00e1rio": { min: 1200, max: 2000 },
+      "Avan\u00e7ado": { min: 2500, max: 4000 }, "Full": { min: 5000, max: 8000 },
+    };
+    return Object.entries(bandCounts).map(([band, data]) => ({
+      band, count: data.count, patients: data.patients,
+      revenueMin: data.count * (priceRanges[band]?.min ?? 0),
+      revenueMax: data.count * (priceRanges[band]?.max ?? 0),
+    }));
+  }),
 });
 
 // ─── FLOW CONFIG ROUTER ────────────────────────────────────────
@@ -516,6 +581,148 @@ const dashboardRouter = router({
   }),
 });
 
+// ─── CLINICAL SYSTEM ROUTER ───────────────────────────────────
+const clinicalSystemRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listClinicalSystems(input.patientId)),
+  create: protectedProcedure.input(z.object({
+    patientId: z.number(),
+    system: z.enum(["cardiovascular", "metabolico", "endocrino", "digestivo", "neuro_humor", "sono", "atividade_fisica"]),
+    conditionCode: z.string(), conditionName: z.string(),
+    status: z.enum(["diagnosticado", "potencial", "descartado", "em_investigacao"]).optional(),
+    severity: z.enum(["leve", "moderado", "grave"]).optional(),
+    notes: z.string().optional(), diagnosedAt: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const id = await db.createClinicalSystem(input);
+    await db.logAudit({ userId: ctx.user.id, action: "create", entity: "clinical_system", entityId: id ?? undefined });
+    return { id };
+  }),
+  update: protectedProcedure.input(z.object({
+    id: z.number(), status: z.enum(["diagnosticado", "potencial", "descartado", "em_investigacao"]).optional(),
+    severity: z.enum(["leve", "moderado", "grave"]).optional(), notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const { id, ...data } = input;
+    await db.updateClinicalSystem(id, data);
+    await db.logAudit({ userId: ctx.user.id, action: "update", entity: "clinical_system", entityId: id });
+  }),
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+    await db.deleteClinicalSystem(input.id);
+    await db.logAudit({ userId: ctx.user.id, action: "delete", entity: "clinical_system", entityId: input.id });
+  }),
+});
+
+// ─── SLEEP DETAIL ROUTER ──────────────────────────────────────
+const sleepDetailRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listSleepDetails(input.patientId)),
+  create: protectedProcedure.input(z.object({
+    dailyReportId: z.number(), patientId: z.number(),
+    fallingAsleep: z.string().optional(), waking: z.string().optional(),
+    fragmented: z.string().optional(), daytimeSleepiness: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const id = await db.createSleepDetail(input);
+    return { id };
+  }),
+});
+
+// ─── PHYSICAL ACTIVITY DETAIL ROUTER ──────────────────────────
+const physicalActivityRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listPhysicalActivityDetails(input.patientId)),
+  create: protectedProcedure.input(z.object({
+    dailyReportId: z.number(), patientId: z.number(),
+    activityType: z.string(), frequencyPerWeek: z.number().optional(),
+    period: z.enum(["manha", "tarde", "noite"]).optional(),
+    intensity: z.enum(["leve", "moderada", "intensa"]).optional(),
+    durationMinutes: z.number().optional(), notes: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const id = await db.createPhysicalActivityDetail(input);
+    return { id };
+  }),
+});
+
+// ─── POLYPHARMACY ROUTER ──────────────────────────────────────
+const polypharmacyRouter = router({
+  rules: protectedProcedure.query(async () => db.listPolypharmacyRules()),
+  check: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.checkPolypharmacy(input.patientId)),
+  createRule: adminProcedure.input(z.object({
+    name: z.string(), medicationA: z.string(), medicationB: z.string().optional(),
+    interactionType: z.enum(["contraindicacao", "precaucao", "monitorar", "limiar_polifarmacia"]),
+    description: z.string(), threshold: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const id = await db.createPolypharmacyRule(input);
+    return { id };
+  }),
+  updateRule: adminProcedure.input(z.object({
+    id: z.number(), isActive: z.boolean().optional(), description: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const { id, ...data } = input;
+    await db.updatePolypharmacyRule(id, data);
+  }),
+});
+
+// ─── TEAM QUEUE ROUTER ────────────────────────────────────────
+const teamQueueRouter = router({
+  list: protectedProcedure.input(z.object({ profile: z.string().optional() }).optional())
+    .query(async ({ input }) => db.listTeamQueue(input?.profile)),
+  create: protectedProcedure.input(z.object({
+    patientId: z.number(),
+    assignedProfile: z.enum(["enfermagem", "medico_assistente", "supervisor", "nao_atribuido"]).optional(),
+    assignedToId: z.number().optional(),
+    priority: z.enum(["baixa", "normal", "alta", "urgente"]).optional(),
+    reason: z.string(), source: z.string().optional(), notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    // Auto-route by complexity if config enabled
+    let profile = input.assignedProfile ?? "nao_atribuido";
+    const autoRouteUrgente = await db.getFlowConfig("auto_route_urgente_supervisor");
+    const autoRouteAlta = await db.getFlowConfig("auto_route_alta_medico");
+    if (autoRouteUrgente?.configValue === "true" && input.priority === "urgente") {
+      profile = "supervisor";
+    } else if (autoRouteAlta?.configValue === "true" && input.priority === "alta") {
+      profile = "medico_assistente";
+    }
+    const id = await db.createTeamQueueItem({ ...input, assignedProfile: profile });
+    await db.logAudit({ userId: ctx.user.id, action: "create", entity: "team_queue", entityId: id ?? undefined });
+    return { id };
+  }),
+  update: protectedProcedure.input(z.object({
+    id: z.number(), assignedProfile: z.enum(["enfermagem", "medico_assistente", "supervisor", "nao_atribuido"]).optional(),
+    assignedToId: z.number().optional(), status: z.enum(["pendente", "em_atendimento", "concluido"]).optional(),
+    notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const { id, ...data } = input;
+    await db.updateTeamQueueItem(id, data);
+    await db.logAudit({ userId: ctx.user.id, action: "update", entity: "team_queue", entityId: id });
+  }),
+});
+
+// ─── PROTOCOL DOCUMENT ROUTER ─────────────────────────────────
+const protocolDocumentRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listProtocolDocuments(input.patientId)),
+  create: protectedProcedure.input(z.object({
+    patientId: z.number(), sessionId: z.number().optional(),
+    documentType: z.enum(["protocolo", "anamnese", "relatorio"]).optional(),
+    title: z.string(), scoreBand: z.string().optional(), score: z.number().optional(),
+    signedByName: z.string().optional(), signedByCRM: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    // Check if protocol creation is blocked by pending flags
+    const blockConfig = await db.getFlowConfig("bloquear_protocolo_flag_pendente");
+    if (blockConfig?.configValue === "true") {
+      const flags = await db.listClinicalFlags(input.patientId);
+      const pendingFlags = flags.filter((f: any) => f.status === "pendente");
+      if (pendingFlags.length > 0) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: `Protocolo bloqueado: ${pendingFlags.length} flag(s) cl\u00ednica(s) pendente(s) de valida\u00e7\u00e3o humana.` });
+      }
+    }
+    const id = await db.createProtocolDocument({ ...input, signedAt: input.signedByName ? new Date() : null });
+    await db.logAudit({ userId: ctx.user.id, action: "create", entity: "protocol_document", entityId: id ?? undefined });
+    return { id };
+  }),
+  markSent: protectedProcedure.input(z.object({
+    id: z.number(), sentVia: z.enum(["whatsapp", "email"]),
+  })).mutation(async ({ input, ctx }) => {
+    await db.updateProtocolDocument(input.id, { sentVia: input.sentVia, sentAt: new Date() });
+    await db.logAudit({ userId: ctx.user.id, action: "send_protocol", entity: "protocol_document", entityId: input.id });
+  }),
+});
+
 // ─── MAIN ROUTER ───────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -543,6 +750,12 @@ export const appRouter = router({
   medication: medicationRouter,
   funnel: funnelRouter,
   flowConfig: flowConfigRouter,
+  clinicalSystem: clinicalSystemRouter,
+  sleepDetail: sleepDetailRouter,
+  physicalActivity: physicalActivityRouter,
+  polypharmacy: polypharmacyRouter,
+  teamQueue: teamQueueRouter,
+  protocolDocument: protocolDocumentRouter,
 });
 
 export type AppRouter = typeof appRouter;

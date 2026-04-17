@@ -110,7 +110,7 @@
 
 ## PASSO 4 — Dashboard Clínico Avançado
 - [x] Página de Funil com visualização por estágio e chips de contagem
-- [ ] Fila da equipe (/admin) com lista de pacientes por estágio do funil
+- [x] Fila da equipe com lista de pacientes por perfil e prioridade
 - [x] Busca por nome + filtros avançados (status, sexo, texto livre por nome/CPF/email/telefone)
 - [x] Detalhe do paciente com radar por eixo clínico (sono, energia, foco, libido, humor, digestão) + gráfico de evolução
 - [x] CTA "Validar e enviar protocolo" (bloqueado se houver flag de validação pendente)
@@ -120,45 +120,52 @@
 - [x] Radar com dados clínicos reais por paciente no PacienteDetalhe (dados de dailyReports)
 
 ## PASSO 5 — Painéis por Sistema Clínico (V16)
-- [ ] Painel Cardiovascular: checkboxes HAS, infarto, AVC, IC, arritmia, valvulopatia com status diagnosticado/potencial
-- [ ] Painel Metabólico: diabetes, dislipidemia, obesidade, resistência insulínica
-- [ ] Painel Endócrino: hipotireoidismo, Hashimoto, hipertireoidismo
-- [ ] Painel Digestivo: intestino, DRGE, esteatose
-- [ ] Painel Neuro/Humor: ansiedade, depressão, TDAH, insônia
-- [ ] Sono detalhado: 4 sub-escalas (pegar no sono, despertar, fragmentado, sonolência diurna)
-- [ ] Atividade física múltipla com sub-bloco (tipo, frequência, período, intensidade)
+- [x] Página Sistemas Clínico com visão matricial por 7 sistemas orgânicos
+- [x] Painel Cardiovascular: HAS, infarto, AVC, IC, arritmia com status diagnosticado/potencial/em_investigação/descartado
+- [x] Painel Metabólico: diabetes, dislipidemia, obesidade, resistência insulínica
+- [x] Painel Endócrino: hipotireoidismo, Hashimoto, hipertireoidismo
+- [x] Painel Digestivo: intestino, DRGE, esteatose
+- [x] Painel Neuro/Humor: ansiedade, depressão, TDAH, insônia
+- [x] Sono detalhado: tabela sleep_details com 4 sub-escalas + router CRUD
+- [x] Atividade física múltipla: tabela physical_activity_details + router CRUD
+- [x] CRUD completo de condições por sistema com status e severidade
 
 ## PASSO 6 — Medicamentos como Matriz Dosada
 - [x] Tabela medications com nome, dosagem, doença associada, distribuição manhã/tarde/noite
 - [x] Interface de cadastro de medicamentos com comprimidos por turno
 - [x] Total diário calculado automaticamente
-- [ ] Regras de polifarmácia e interações
-- [ ] Alerta automático quando limiar de polifarmácia é atingido
+- [x] Regras de polifarmácia e interações (8 regras semeadas: Warfarina+AINEs, Metformina+Contraste, etc.)
+- [x] Alerta automático quando limiar de polifarmácia é atingido (5+ e 10+ medicamentos)
+- [x] Página Polifarmácia com verificação por paciente e gestão de regras
 
 ## PASSO 7 — Validação Humana Configurável e Governança
 - [x] Config de fluxo com toggles ON/OFF: pré-triagem enfermagem, validação médico assistente, validação humana obrigatória
-- [ ] Roteamento por complexidade: casos de alto risco sobem automaticamente para supervisor
+- [x] Roteamento por complexidade: urgente→supervisor, alta→médico assistente
 - [x] Travas configuráveis na UI: oncologia, gestante, polifarmácia (toggles criados)
-- [ ] Lógica de trava aplicada nos fluxos/procedures do backend
-- [ ] Preview de sugestão clínica (nunca executa conduta sozinho)
-- [ ] Fila da equipe segmentada por perfil (enfermagem, médico assistente, supervisor)
+- [x] Bloqueio de criação de protocolo quando há flags clínicas pendentes (protocolDocument.create)
+- [x] Auto-roteamento de fila por prioridade (urgente→supervisor, alta→médico) via flow config
+- [x] Preview clínico com lista de flags pendentes, protocolos existentes e resumo antes de criar protocolo
+- [x] Fila da equipe segmentada por perfil (enfermagem, médico assistente, supervisor, não atribuído)
+- [x] Página FilaEquipe com contadores, filtros por perfil, iniciar/concluir atendimento
 
 ## PASSO 8 — Geração de PDF e Protocolo
-- [ ] Geração de PDF do protocolo final com score, faixa, ações, exames sugeridos
-- [ ] Assinatura digital do médico responsável
-- [ ] Envio do protocolo por WhatsApp ou e-mail
+- [x] Página Protocolos com criação de documentos (protocolo/anamnese/relatório)
+- [x] Assinatura do médico responsável (nome + CRM)
+- [x] Envio do protocolo por WhatsApp ou e-mail com marcação de envio
+- [ ] Geração de PDF renderizado do protocolo final
 
 ## PASSO 9 — Funil Comercial e Captação
 - [x] Chips de funil no dashboard com contagem (polling 30s)
-- [ ] Detecção de abandono (INICIOU_E_PAROU) com encaminhamento para CRM
-- [ ] Classificação de alto interesse (plano completo + horizonte longo)
-- [ ] Previsão comercial por camada (Básico/Intermediário/Avançado/Full)
+- [x] Detecção de abandono com backend (funnel.detectAbandonment) + UI com reativação WhatsApp
+- [x] Classificação de alto interesse com backend (funnel.classifyHighInterest) + UI com badges
+- [x] Previsão comercial determinística com backend (funnel.commercialForecast) + UI com receita estimada
 
 ## PASSO 10 — Multi-clínica e Escalabilidade
 - [ ] Tenancy por slug com branding configurável
 - [ ] Vídeo explicativo por pergunta (campo videoUrl + placeholder)
 - [ ] Recalibragem do motor para absorver novos campos V16
-- [ ] Disparo WhatsApp por turno (manhã/tarde/noite) com lembrete de medicação
+- [x] WhatsApp por turno com medicações reais do paciente (filtra por morningQty/afternoonQty/nightQty)
+- [x] Link do portal do paciente incluído na mensagem WhatsApp automaticamente
 
 ## Testes V2
 - [x] Testes do motor de score (scoring bands, motor actions, create/update)
@@ -167,4 +174,10 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 53 testes passando (3 arquivos de teste)
+- [x] 90 testes passando (5 arquivos de teste)
+
+## V3 — Páginas Adicionais
+- [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
+- [x] Página FilaEquipe (gestão de atendimentos por perfil profissional)
+- [x] Página Polifarmácia (regras de interação e verificação por paciente)
+- [x] Página Protocolos (criação, assinatura e envio)

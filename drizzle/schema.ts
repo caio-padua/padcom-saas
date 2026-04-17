@@ -350,3 +350,97 @@ export const flowConfig = mysqlTable("flow_config", {
   notes: text("notes"),
 });
 export type FlowConfig = typeof flowConfig.$inferSelect;
+
+// ─── CLINICAL SYSTEMS (painéis por sistema clínico V16) ──────
+export const clinicalSystems = mysqlTable("clinical_systems", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  system: mysqlEnum("system", ["cardiovascular", "metabolico", "endocrino", "digestivo", "neuro_humor", "sono", "atividade_fisica"]).notNull(),
+  conditionCode: varchar("conditionCode", { length: 50 }).notNull(),
+  conditionName: varchar("conditionName", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["diagnosticado", "potencial", "descartado", "em_investigacao"]).default("potencial").notNull(),
+  severity: mysqlEnum("severity", ["leve", "moderado", "grave"]).default("leve"),
+  notes: text("notes"),
+  diagnosedAt: varchar("diagnosedAt", { length: 10 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ClinicalSystem = typeof clinicalSystems.$inferSelect;
+
+// ─── SLEEP DETAIL (4 sub-escalas de sono V16) ────────────────
+export const sleepDetails = mysqlTable("sleep_details", {
+  id: int("id").autoincrement().primaryKey(),
+  dailyReportId: int("dailyReportId").notNull(),
+  patientId: int("patientId").notNull(),
+  fallingAsleep: decimal("fallingAsleep", { precision: 4, scale: 1 }),
+  waking: decimal("waking", { precision: 4, scale: 1 }),
+  fragmented: decimal("fragmented", { precision: 4, scale: 1 }),
+  daytimeSleepiness: decimal("daytimeSleepiness", { precision: 4, scale: 1 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SleepDetail = typeof sleepDetails.$inferSelect;
+
+// ─── PHYSICAL ACTIVITY DETAIL (sub-bloco V16) ────────────────
+export const physicalActivityDetails = mysqlTable("physical_activity_details", {
+  id: int("id").autoincrement().primaryKey(),
+  dailyReportId: int("dailyReportId").notNull(),
+  patientId: int("patientId").notNull(),
+  activityType: varchar("activityType", { length: 100 }).notNull(),
+  frequencyPerWeek: int("frequencyPerWeek"),
+  period: mysqlEnum("period", ["manha", "tarde", "noite"]),
+  intensity: mysqlEnum("intensity", ["leve", "moderada", "intensa"]),
+  durationMinutes: int("durationMinutes"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PhysicalActivityDetail = typeof physicalActivityDetails.$inferSelect;
+
+// ─── POLYPHARMACY RULES ──────────────────────────────────────
+export const polypharmacyRules = mysqlTable("polypharmacy_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  medicationA: varchar("medicationA", { length: 255 }).notNull(),
+  medicationB: varchar("medicationB", { length: 255 }),
+  interactionType: mysqlEnum("interactionType", ["contraindicacao", "precaucao", "monitorar", "limiar_polifarmacia"]).notNull(),
+  description: text("description").notNull(),
+  threshold: int("threshold"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PolypharmacyRule = typeof polypharmacyRules.$inferSelect;
+
+// ─── TEAM QUEUE (fila da equipe) ─────────────────────────────
+export const teamQueue = mysqlTable("team_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  assignedProfile: mysqlEnum("assignedProfile", ["enfermagem", "medico_assistente", "supervisor", "nao_atribuido"]).default("nao_atribuido").notNull(),
+  assignedToId: int("assignedToId"),
+  priority: mysqlEnum("priority", ["baixa", "normal", "alta", "urgente"]).default("normal").notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  source: varchar("source", { length: 100 }),
+  status: mysqlEnum("status", ["pendente", "em_atendimento", "concluido"]).default("pendente").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type TeamQueueItem = typeof teamQueue.$inferSelect;
+
+// ─── PROTOCOL DOCUMENTS (PDF gerado) ─────────────────────────
+export const protocolDocuments = mysqlTable("protocol_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  sessionId: int("sessionId"),
+  documentType: mysqlEnum("documentType", ["protocolo", "anamnese", "relatorio"]).default("protocolo").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  fileUrl: text("fileUrl"),
+  fileKey: varchar("fileKey", { length: 255 }),
+  scoreBand: varchar("scoreBand", { length: 50 }),
+  score: int("score"),
+  signedByName: varchar("signedByName", { length: 255 }),
+  signedByCRM: varchar("signedByCRM", { length: 50 }),
+  signedAt: timestamp("signedAt"),
+  sentVia: mysqlEnum("sentVia", ["whatsapp", "email", "nenhum"]).default("nenhum"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ProtocolDocument = typeof protocolDocuments.$inferSelect;

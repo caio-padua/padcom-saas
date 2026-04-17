@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { FileHeart, Sun, Sunset, Moon } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileHeart, Sun, Sunset, Moon, MessageSquare, Pill, Send, Clock } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -15,6 +16,8 @@ export default function RelatosDiarios() {
   const { data: patients } = trpc.patient.list.useQuery();
   const createReport = trpc.dailyReport.create.useMutation();
   const [selectedPatient, setSelectedPatient] = useState<string>("");
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [whatsappTurno, setWhatsappTurno] = useState<"manha" | "tarde" | "noite">("manha");
   const [form, setForm] = useState({
     reportDate: new Date().toISOString().split("T")[0],
     period: "" as string,
@@ -22,10 +25,17 @@ export default function RelatosDiarios() {
     systolicBP: "", diastolicBP: "", weight: "", generalNotes: "",
   });
 
-  const { data: reports } = trpc.dailyReport.list.useQuery(
+  const { data: reports, refetch: refetchReports } = trpc.dailyReport.list.useQuery(
     { patientId: Number(selectedPatient), limit: 20 },
     { enabled: !!selectedPatient }
   );
+
+  const { data: medications } = trpc.medication.list.useQuery(
+    { patientId: Number(selectedPatient) },
+    { enabled: !!selectedPatient }
+  );
+
+  const selectedPatientData = (patients ?? []).find((p: any) => p.id === Number(selectedPatient));
 
   const handleSubmit = async () => {
     if (!selectedPatient) { toast.error("Selecione um paciente"); return; }
@@ -44,18 +54,96 @@ export default function RelatosDiarios() {
         generalNotes: form.generalNotes || undefined,
       });
       toast.success("Relato registrado com sucesso!");
+      refetchReports();
     } catch (e: any) { toast.error(e.message); }
   };
 
   const periodIcon = { manha: Sun, tarde: Sunset, noite: Moon };
+  const turnoLabel = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
+  const turnoHorario = { manha: "07:00–08:00", tarde: "12:00–13:00", noite: "19:00–20:00" };
+
+  const generateWhatsappMessage = (turno: "manha" | "tarde" | "noite") => {
+    const name = selectedPatientData?.name ?? "Paciente";
+    const label = turnoLabel[turno];
+    const horario = turnoHorario[turno];
+    // Filtrar medicações ativas do turno selecionado
+    const qtyField = turno === "manha" ? "morningQty" : turno === "tarde" ? "afternoonQty" : "nightQty";
+    const turnoMeds = (medications ?? []).filter((m: any) => m.isActive !== false && (m[qtyField] ?? 0) > 0);
+    let medsText = "";
+    if (turnoMeds.length > 0) {
+      medsText = turnoMeds.map((m: any) => {
+        const qty = m[qtyField];
+        const dose = m.dosageValue ? ` (${m.dosageValue}${m.dosageUnit ? " " + m.dosageUnit : ""})` : "";
+        return `  💊 ${m.name}${dose} — ${qty} comprimido${qty > 1 ? "s" : ""}`;
+      }).join("\n");
+      medsText = `\n*Suas medicações deste turno:*\n${medsText}\n`;
+    } else {
+      medsText = "\n📋 Confira suas medicações conforme prescrito.\n";
+    }
+    const portalLink = selectedPatientData?.accessToken
+      ? `\n🔗 Acesse seu portal: ${window.location.origin}/portal/${selectedPatientData.accessToken}\n`
+      : "";
+    return `Olá ${name}, tudo bem? 😊\n\n` +
+      `Lembrete de *medicação do turno da ${label}* (${horario}):\n` +
+      medsText +
+      portalLink +
+      `\nApós tomar, registre como se sentiu:\n` +
+      `• Nível de energia\n• Qualidade do sono\n• Humor geral\n• Qualquer reação ou desconforto\n\n` +
+      `Seu acompanhamento é muito importante! 💚\n\n` +
+      `Equipe PADCOM`;
+  };
+
+  const sendWhatsapp = (turno: "manha" | "tarde" | "noite") => {
+    if (!selectedPatientData?.phone) { toast.error("Paciente sem telefone cadastrado"); return; }
+    const phone = selectedPatientData.phone.replace(/\D/g, "");
+    const msg = encodeURIComponent(generateWhatsappMessage(turno));
+    window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
+    toast.success(`Lembrete de ${turnoLabel[turno]} enviado via WhatsApp`);
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <FileHeart className="h-6 w-6 text-primary" /> Relatos Diários
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Via 3 — Registro de sintomas diários com seletor de período</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <FileHeart className="h-6 w-6 text-primary" /> Relatos Diários
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">Via 3 — Registro de sintomas diários com seletor de período</p>
+        </div>
+        {selectedPatient && selectedPatientData?.phone && (
+          <Dialog open={whatsappOpen} onOpenChange={setWhatsappOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-1.5">
+                <MessageSquare className="h-4 w-4" /> Lembrete WhatsApp
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Pill className="h-5 w-5" /> Lembrete de Medicação por Turno</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">Envie um lembrete de medicação para <strong>{selectedPatientData.name}</strong> no turno desejado.</p>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {(["manha", "tarde", "noite"] as const).map(turno => {
+                  const Icon = periodIcon[turno];
+                  return (
+                    <Card key={turno} className={`cursor-pointer transition-all hover:border-primary/50 ${whatsappTurno === turno ? "border-primary bg-primary/5" : ""}`}
+                      onClick={() => setWhatsappTurno(turno)}>
+                      <CardContent className="pt-4 text-center space-y-2">
+                        <Icon className="h-8 w-8 mx-auto text-primary" />
+                        <p className="font-medium text-sm">{turnoLabel[turno]}</p>
+                        <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1"><Clock className="h-3 w-3" />{turnoHorario[turno]}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              <div className="mt-3 p-3 rounded-lg bg-muted/50 text-xs whitespace-pre-line max-h-40 overflow-y-auto">
+                {generateWhatsappMessage(whatsappTurno)}
+              </div>
+              <Button className="w-full mt-2 gap-1.5" onClick={() => { sendWhatsapp(whatsappTurno); setWhatsappOpen(false); }}>
+                <Send className="h-4 w-4" /> Enviar via WhatsApp ({turnoLabel[whatsappTurno]})
+              </Button>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -84,7 +172,7 @@ export default function RelatosDiarios() {
                         <Button key={p} variant={form.period === p ? "default" : "outline"} size="sm" className="flex-1 gap-1 text-xs"
                           onClick={() => setForm(f => ({ ...f, period: p }))}>
                           <Icon className="h-3.5 w-3.5" />
-                          {p === "manha" ? "Manhã" : p === "tarde" ? "Tarde" : "Noite"}
+                          {turnoLabel[p]}
                         </Button>
                       );
                     })}

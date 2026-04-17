@@ -25,7 +25,7 @@ import {
   LayoutDashboard, Users, ClipboardList, Stethoscope, Sparkles,
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
   UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
-  Cog, Filter, Tablets, GitBranch
+  Cog, Filter, Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -50,6 +50,10 @@ const menuItems = [
   { icon: Filter, label: "Config. Fluxo", path: "/config-fluxo" },
   { icon: UserCog, label: "Consultoras", path: "/consultoras" },
   { icon: ClipboardList, label: "Perguntas", path: "/perguntas" },
+  { icon: Heart, label: "Sistemas Clínico", path: "/sistemas-clinico" },
+  { icon: ListTodo, label: "Fila da Equipe", path: "/fila-equipe" },
+  { icon: AlertTriangle, label: "Polifarmácia", path: "/polifarmacia" },
+  { icon: FileText, label: "Protocolos", path: "/protocolos" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 
