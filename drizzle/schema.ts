@@ -28,6 +28,10 @@ export const patients = mysqlTable("patients", {
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),
   clinicId: int("clinicId"),
+  entryChannel: mysqlEnum("entryChannel", [
+    "trafego_pago", "consultora", "site", "vendedor_externo", "referral", "whatsapp_bot", "direto",
+  ]).default("direto"),
+  entryLeadId: int("entryLeadId"),
   createdById: int("createdById").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -473,3 +477,365 @@ export const clinics = mysqlTable("clinics", {
 });
 export type Clinic = typeof clinics.$inferSelect;
 export type InsertClinic = typeof clinics.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════
+// V10 — BRAÇOS DE ENTRADA + GOVERNANÇA + DISPATCHER FARMÁCIA
+// ═══════════════════════════════════════════════════════════
+
+// ─── ENTRY CHANNELS (canais de entrada) ─────────────────────
+// Alias Núcleo: canais_entrada
+export const entryChannels = mysqlTable("entry_channels", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: mysqlEnum("type", [
+    "trafego_pago",      // E1: Beacon/Linktree/Meta Ads
+    "consultora",        // E2: Consultora/Assistente inicia
+    "site",              // E3: Paciente solicita pelo site
+    "vendedor_externo",  // E4: Vendedor envia link
+    "referral",          // E5: Indicação de paciente existente
+    "whatsapp_bot",      // E6: WhatsApp Bot → triagem
+  ]).notNull(),
+  description: text("description"),
+  utmSource: varchar("utmSource", { length: 100 }),
+  utmMedium: varchar("utmMedium", { length: 100 }),
+  utmCampaign: varchar("utmCampaign", { length: 100 }),
+  linkTemplate: text("linkTemplate"),
+  isActive: boolean("isActive").default(true).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EntryChannel = typeof entryChannels.$inferSelect;
+
+// ─── ENTRY LEADS (leads capturados por qualquer braço) ──────
+// Alias Núcleo: leads_entrada
+export const entryLeads = mysqlTable("entry_leads", {
+  id: int("id").autoincrement().primaryKey(),
+  channelId: int("channelId"),
+  channelType: mysqlEnum("channelType", [
+    "trafego_pago", "consultora", "site", "vendedor_externo", "referral", "whatsapp_bot",
+  ]).notNull(),
+  // Dados do lead
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  cpf: varchar("cpf", { length: 14 }),
+  // Rastreio UTM
+  utmSource: varchar("utmSource", { length: 100 }),
+  utmMedium: varchar("utmMedium", { length: 100 }),
+  utmCampaign: varchar("utmCampaign", { length: 100 }),
+  utmTerm: varchar("utmTerm", { length: 100 }),
+  utmContent: varchar("utmContent", { length: 100 }),
+  landingPage: varchar("landingPage", { length: 500 }),
+  // Referência do originador
+  referredByPatientId: int("referredByPatientId"),
+  vendorId: int("vendorId"),
+  consultantId: int("consultantId"),
+  // Funil
+  status: mysqlEnum("status", [
+    "novo", "contatado", "agendado", "anamnese_iniciada", "anamnese_concluida",
+    "prescricao_gerada", "convertido", "perdido", "reativado",
+  ]).default("novo").notNull(),
+  // Vínculo com paciente (quando converte)
+  patientId: int("patientId"),
+  clinicId: int("clinicId"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EntryLead = typeof entryLeads.$inferSelect;
+
+// ─── PHARMACIES (farmácias parceiras) ───────────────────────
+// Alias Núcleo: farmacias_parceiras
+export const pharmacies = mysqlTable("pharmacies", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  cnpj: varchar("cnpj", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 20 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  contactPerson: varchar("contactPerson", { length: 255 }),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }).default("30.00").notNull(),
+  integrationModel: mysqlEnum("integrationModel", ["portal", "marketplace", "drive", "manual"]).default("portal").notNull(),
+  capabilities: json("capabilities"),
+  isActive: boolean("isActive").default(true).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Pharmacy = typeof pharmacies.$inferSelect;
+
+// ─── PRESCRIPTION DISPATCHES (despachos para farmácia) ──────
+// Alias Núcleo: despachos_prescricao
+export const prescriptionDispatches = mysqlTable("prescription_dispatches", {
+  id: int("id").autoincrement().primaryKey(),
+  prescriptionId: int("prescriptionId").notNull(),
+  patientId: int("patientId").notNull(),
+  pharmacyId: int("pharmacyId").notNull(),
+  status: mysqlEnum("status", [
+    "pendente", "enviado", "aceito", "em_manipulacao", "pronto", "entregue", "cancelado",
+  ]).default("pendente").notNull(),
+  totalValue: decimal("totalValue", { precision: 10, scale: 2 }),
+  commissionValue: decimal("commissionValue", { precision: 10, scale: 2 }),
+  commissionPercent: decimal("commissionPercent", { precision: 5, scale: 2 }),
+  sentAt: timestamp("sentAt"),
+  acceptedAt: timestamp("acceptedAt"),
+  readyAt: timestamp("readyAt"),
+  deliveredAt: timestamp("deliveredAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  cancelReason: text("cancelReason"),
+  notes: text("notes"),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PrescriptionDispatch = typeof prescriptionDispatches.$inferSelect;
+
+// ─── VALIDATION CASCADE (cascata de validação) ──────────────
+// Alias Núcleo: fila_preceptor + eventos_clinicos
+export const validationCascade = mysqlTable("validation_cascade", {
+  id: int("id").autoincrement().primaryKey(),
+  entityType: mysqlEnum("entityType", [
+    "prescricao", "protocolo", "anamnese", "exame", "formula", "injetavel", "implante",
+  ]).notNull(),
+  entityId: int("entityId").notNull(),
+  patientId: int("patientId").notNull(),
+  // Etapa na cascata
+  step: mysqlEnum("step", [
+    "triagem_enfermagem",     // Enfermeira/Biomédica faz anamnese
+    "validacao_medico",       // Médico delegado valida (1a lupa)
+    "validacao_preceptor",    // Preceptor/CRM chefe valida (microscópio)
+  ]).notNull(),
+  // Profissional que validou
+  professionalId: int("professionalId"),
+  professionalName: varchar("professionalName", { length: 255 }),
+  professionalCRM: varchar("professionalCRM", { length: 50 }),
+  certificateDigital: varchar("certificateDigital", { length: 255 }),
+  // Status
+  status: mysqlEnum("status", [
+    "aguardando", "homologado", "devolvido", "vencido", "dispensado",
+  ]).default("aguardando").notNull(),
+  observation: text("observation"),
+  returnReason: text("returnReason"),
+  // Prazos
+  deadline: timestamp("deadline"),
+  validatedAt: timestamp("validatedAt"),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ValidationCascadeEntry = typeof validationCascade.$inferSelect;
+
+// ─── PROFESSIONAL TRUST (delegação de confiança) ────────────
+// Alias Núcleo: profissional_confianca
+export const professionalTrust = mysqlTable("professional_trust", {
+  id: int("id").autoincrement().primaryKey(),
+  professionalId: int("professionalId").notNull(),
+  professionalName: varchar("professionalName", { length: 255 }).notNull(),
+  professionalCRM: varchar("professionalCRM", { length: 50 }),
+  professionalRole: mysqlEnum("professionalRole", [
+    "medico_consultor", "medico_assistente", "enfermeiro", "biomedico", "nutricionista", "psicologo",
+  ]).notNull(),
+  // Quem delegou
+  delegatedById: int("delegatedById").notNull(),
+  delegatedByName: varchar("delegatedByName", { length: 255 }),
+  delegatedByCRM: varchar("delegatedByCRM", { length: 50 }),
+  // Nível de confiança
+  trustLevel: mysqlEnum("trustLevel", [
+    "total",        // Pode validar tudo sem preceptor
+    "parcial",      // Pode validar itens simples, complexos vão pro preceptor
+    "supervisionado", // Tudo vai pro preceptor, mas aparece como validador intermediário
+  ]).default("supervisionado").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  observation: text("observation"),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ProfessionalTrustEntry = typeof professionalTrust.$inferSelect;
+
+// ─── VALIDATION CONFIG (config de validação por tipo de item) ─
+// Alias Núcleo: soberania_config (parcial)
+export const validationConfig = mysqlTable("validation_config", {
+  id: int("id").autoincrement().primaryKey(),
+  itemType: varchar("itemType", { length: 100 }).notNull(),
+  itemName: varchar("itemName", { length: 255 }),
+  requiresHumanValidation: boolean("requiresHumanValidation").default(true).notNull(),
+  requiresCRM: boolean("requiresCRM").default(true).notNull(),
+  minimumTrustLevel: mysqlEnum("minimumTrustLevel", ["total", "parcial", "supervisionado"]).default("supervisionado").notNull(),
+  autoApproveBelow: decimal("autoApproveBelow", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ValidationConfigEntry = typeof validationConfig.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════
+// V10.1 — GRAUS DE CONDUTA + WEBHOOK + DELIVERY CONFIG
+// ═══════════════════════════════════════════════════════════
+
+// ─── CONDUCT GRADES (classificação de condutas por score) ───
+// Alias Núcleo: graus_conduta
+export const conductGrades = mysqlTable("conduct_grades", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  grade: mysqlEnum("grade", ["grau_1_auto", "grau_2_semi", "grau_3_manual"]).notNull(),
+  validationLevel: mysqlEnum("validationLevel", ["N1", "N2", "N3"]).notNull(),
+  minScore: int("minScore").notNull(),
+  maxScore: int("maxScore").notNull(),
+  description: text("description"),
+  // N1: IA valida auto → gera receita → despacha farmácia
+  // N2: IA valida → precisa 1 clique do consultor delegado
+  // N3: cascata completa (enfermeira → médico → preceptor)
+  autoGenerateRecipe: boolean("autoGenerateRecipe").default(false).notNull(),
+  autoDispatchPharmacy: boolean("autoDispatchPharmacy").default(false).notNull(),
+  requiresConsultantClick: boolean("requiresConsultantClick").default(true).notNull(),
+  requiresFullCascade: boolean("requiresFullCascade").default(false).notNull(),
+  color: varchar("color", { length: 20 }),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  clinicId: int("clinicId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ConductGrade = typeof conductGrades.$inferSelect;
+
+// ─── WEBHOOK ENDPOINTS (integrações ManyChat/Typebot/n8n) ───
+// Alias Núcleo: webhooks_entrada
+export const webhookEndpoints = mysqlTable("webhook_endpoints", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  platform: mysqlEnum("platform", [
+    "manychat", "typebot", "botpress", "n8n", "zapier", "make", "custom",
+  ]).notNull(),
+  secretToken: varchar("secretToken", { length: 128 }).notNull(),
+  targetAction: mysqlEnum("targetAction", [
+    "create_lead",           // Cria lead no funil
+    "start_quick_anamnesis", // Inicia anamnese rápida
+    "update_lead_status",    // Atualiza status do lead
+    "trigger_prescription",  // Dispara prescrição automática
+  ]).notNull(),
+  // Config de mapeamento de campos
+  fieldMapping: json("fieldMapping"),
+  // Qual canal de entrada associar
+  defaultChannelId: int("defaultChannelId"),
+  defaultChannelType: mysqlEnum("defaultChannelType", [
+    "trafego_pago", "consultora", "site", "vendedor_externo", "referral", "whatsapp_bot",
+  ]),
+  isActive: boolean("isActive").default(true).notNull(),
+  lastCalledAt: timestamp("lastCalledAt"),
+  callCount: int("callCount").default(0).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+
+// ─── RECIPE DELIVERY CONFIG (toggle destino da receita) ─────
+// Alias Núcleo: config_entrega_receita
+export const recipeDeliveryConfig = mysqlTable("recipe_delivery_config", {
+  id: int("id").autoincrement().primaryKey(),
+  deliveryTarget: mysqlEnum("deliveryTarget", [
+    "paciente",    // Só para o paciente
+    "farmacia",    // Só para a farmácia
+    "ambos",       // Para paciente E farmácia
+  ]).default("ambos").notNull(),
+  defaultPharmacyId: int("defaultPharmacyId"),
+  autoSelectPharmacy: boolean("autoSelectPharmacy").default(false).notNull(),
+  pharmacySelectionCriteria: mysqlEnum("pharmacySelectionCriteria", [
+    "mais_proxima", "menor_preco", "maior_comissao", "rotativa", "fixa",
+  ]).default("fixa"),
+  sendViaWhatsapp: boolean("sendViaWhatsapp").default(false).notNull(),
+  sendViaEmail: boolean("sendViaEmail").default(true).notNull(),
+  clinicId: int("clinicId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type RecipeDeliveryConfigEntry = typeof recipeDeliveryConfig.$inferSelect;
+
+// ─── QUICK ANAMNESIS TEMPLATES (anamnese rápida via chatbot) ─
+// Alias Núcleo: templates_anamnese_rapida
+export const quickAnamnesisTemplates = mysqlTable("quick_anamnesis_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  // Subset de questionIds para anamnese rápida
+  questionIds: json("questionIds").notNull(),
+  targetConductGrade: mysqlEnum("targetConductGrade", ["grau_1_auto", "grau_2_semi"]),
+  // Se grau_1, qual prescrição template gerar automaticamente
+  autoPrescriptionTemplate: json("autoPrescriptionTemplate"),
+  isActive: boolean("isActive").default(true).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type QuickAnamnesisTemplate = typeof quickAnamnesisTemplates.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════
+// V10.2 — COMPETÊNCIA REGULATÓRIA (quem pode prescrever o quê)
+// ═══════════════════════════════════════════════════════════
+
+// ─── REGULATORY COMPETENCE (classificação regulatória de condutas) ─
+// Alias Núcleo: competencia_regulatoria / soberania_item
+export const regulatoryCompetence = mysqlTable("regulatory_competence", {
+  id: int("id").autoincrement().primaryKey(),
+  // Identificação do item/conduta
+  itemName: varchar("itemName", { length: 255 }).notNull(),
+  itemCategory: mysqlEnum("itemCategory", [
+    "medicamento", "suplemento", "formula_magistral", "procedimento",
+    "exame", "protocolo", "conduta_clinica", "dispositivo",
+  ]).notNull(),
+  // Via de administração (determina complexidade regulatória)
+  administrationRoute: mysqlEnum("administrationRoute", [
+    "oral", "injetavel_iv", "injetavel_im", "injetavel_sc",
+    "topico", "implante", "inalatorio", "sublingual",
+    "retal", "oftalmico", "nasal", "transdermico",
+    "procedimento_invasivo", "procedimento_nao_invasivo", "nenhuma",
+  ]).notNull(),
+  // Score de complexidade regulatória (0-100)
+  // 0-30: qualquer profissional habilitado pode (farmacêutico, enfermeiro, etc.)
+  // 31-60: profissional de saúde com supervisão médica
+  // 61-100: exclusivamente médico com CRM
+  regulatoryScore: int("regulatoryScore").notNull(),
+  // Quem pode prescrever este item (flags booleanas)
+  canMedico: boolean("canMedico").default(true).notNull(),
+  canEnfermeiro: boolean("canEnfermeiro").default(false).notNull(),
+  canFarmaceutico: boolean("canFarmaceutico").default(false).notNull(),
+  canBiomedico: boolean("canBiomedico").default(false).notNull(),
+  canNutricionista: boolean("canNutricionista").default(false).notNull(),
+  canPsicologo: boolean("canPsicologo").default(false).notNull(),
+  // Requer receita com CRM?
+  requiresCRM: boolean("requiresCRM").default(true).notNull(),
+  // Requer receita especial (controlados)?
+  requiresSpecialPrescription: boolean("requiresSpecialPrescription").default(false).notNull(),
+  // Tipo de receita necessária
+  prescriptionType: mysqlEnum("prescriptionType", [
+    "simples",              // Receita simples (vitaminas, suplementos)
+    "comum",                // Receita comum (medicamentos não controlados)
+    "controle_especial",    // Receita de controle especial (C1)
+    "antimicrobiano",       // Receita de antimicrobiano
+    "retencao",             // Receita com retenção (B1, B2)
+    "notificacao_a",        // Notificação de receita A (entorpecentes)
+    "nenhuma",              // Não requer receita
+  ]).default("simples").notNull(),
+  // Nível de validação automático baseado no score
+  autoValidationLevel: mysqlEnum("autoValidationLevel", ["N1", "N2", "N3"]).notNull(),
+  // Descrição e observações regulatórias
+  regulatoryNotes: text("regulatoryNotes"),
+  legalBasis: varchar("legalBasis", { length: 500 }),
+  // Exemplos de uso
+  exampleDosage: varchar("exampleDosage", { length: 255 }),
+  // Agrupamento
+  therapeuticGroup: varchar("therapeuticGroup", { length: 255 }),
+  // Ativo
+  isActive: boolean("isActive").default(true).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type RegulatoryCompetenceEntry = typeof regulatoryCompetence.$inferSelect;

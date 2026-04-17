@@ -108,7 +108,7 @@ export default function RelatosDiarios() {
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <FileHeart className="h-6 w-6 text-primary" /> Relatos Diários
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Via 3 — Registro de sintomas diários com seletor de período</p>
+          <p className="text-sm text-muted-foreground mt-1">Registro diário de sintomas e sinais vitais — sono, energia, humor, foco, PA, peso. Dados alimentam o motor de scoring e evolução clínica.</p>
         </div>
         {selectedPatient && selectedPatientData?.phone && (
           <Dialog open={whatsappOpen} onOpenChange={setWhatsappOpen}>

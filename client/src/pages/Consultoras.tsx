@@ -41,20 +41,23 @@ export default function ConsultorasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><UserCog className="h-6 w-6 text-primary" /> Consultoras</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie o acesso de profissionais autorizados via toggle</p>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie o acesso de profissionais autorizados — enfermeiros, biomédicos, nutricionistas e outros que operam na clínica</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Nova Consultora</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Cadastrar Consultora</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Cadastrar Consultora / Profissional</DialogTitle>
+              <p className="text-sm text-muted-foreground">Cadastre um profissional da saúde que atuará na clínica. A função define o que ele pode prescrever conforme o Score Competência Reguladora.</p>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
-              <div className="space-y-2"><Label>Nome *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">Nome Completo *</Label><p className="text-xs text-muted-foreground">Nome profissional conforme registro no conselho de classe</p><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Telefone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">E-mail Profissional</Label><p className="text-xs text-muted-foreground">E-mail para notificações de validação e cascata</p><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Telefone / WhatsApp</Label><p className="text-xs text-muted-foreground">Contato para alertas urgentes e validações</p><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Função</Label>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Função / Categoria Profissional</Label><p className="text-xs text-muted-foreground">Define quais itens este profissional pode prescrever</p>
                   <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -66,7 +69,7 @@ export default function ConsultorasPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Especialização</Label><Input value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Especialização</Label><p className="text-xs text-muted-foreground">Área de atuação principal — ex: Estética, Integrativa, Ortomolecular</p><Input value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} /></div>
               </div>
               <Button onClick={handleCreate} className="w-full" disabled={createMutation.isPending}>Cadastrar</Button>
             </div>

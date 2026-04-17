@@ -49,16 +49,19 @@ export default function SessoesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><CalendarCheck className="h-6 w-6 text-primary" /> Sessões</h1>
-          <p className="text-sm text-muted-foreground mt-1">Acompanhamento longitudinal — 30/60/90 dias</p>
+          <p className="text-sm text-muted-foreground mt-1">Acompanhamento longitudinal do paciente — registre consultas presenciais, online e retornos em 30/60/90 dias</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="gap-2" disabled={!selectedPatient}><Plus className="h-4 w-4" /> Nova Sessão</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Registrar Sessão</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Registrar Sessão de Acompanhamento</DialogTitle>
+              <p className="text-sm text-muted-foreground">Registre uma consulta ou retorno. O score clínico permite acompanhar a evolução do paciente ao longo do tempo.</p>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Data</Label><Input type="date" value={form.sessionDate} onChange={e => setForm(f => ({ ...f, sessionDate: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Tipo</Label>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Data da Sessão</Label><p className="text-xs text-muted-foreground">Data em que a consulta ou retorno ocorreu</p><Input type="date" value={form.sessionDate} onChange={e => setForm(f => ({ ...f, sessionDate: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Tipo de Sessão</Label><p className="text-xs text-muted-foreground">Modalidade do atendimento — presencial, online ou retorno programado</p>
                   <Select value={form.sessionType} onValueChange={v => setForm(f => ({ ...f, sessionType: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -67,8 +70,8 @@ export default function SessoesPage() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2"><Label>Score Clínico</Label><Input value={form.clinicalScore} onChange={e => setForm(f => ({ ...f, clinicalScore: e.target.value }))} placeholder="7.5" /></div>
-              <div className="space-y-2"><Label>Observações</Label><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">Score Clínico</Label><p className="text-xs text-muted-foreground">Nota de 0 a 10 representando o estado geral do paciente nesta sessão</p><Input value={form.clinicalScore} onChange={e => setForm(f => ({ ...f, clinicalScore: e.target.value }))} placeholder="7.5" /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">Observações Clínicas</Label><p className="text-xs text-muted-foreground">Notas livres sobre o atendimento — queixas, evolução, ajustes de conduta</p><Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} /></div>
               <Button onClick={handleCreate} className="w-full" disabled={createMutation.isPending}>Registrar Sessão</Button>
             </div>
           </DialogContent>

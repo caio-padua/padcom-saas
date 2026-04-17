@@ -65,7 +65,7 @@ export default function EvolucaoPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><TrendingUp className="h-6 w-6 text-primary" /> Evolução Longitudinal</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gráficos de evolução de sintomas e exames ao longo do tempo</p>
+        <p className="text-sm text-muted-foreground mt-1">Gráficos de evolução longitudinal — acompanhe sintomas, exames e scores clínicos ao longo do tempo para cada paciente</p>
       </div>
 
       <div className="flex gap-3 flex-wrap">

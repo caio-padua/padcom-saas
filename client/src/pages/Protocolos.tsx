@@ -153,6 +153,7 @@ export default function Protocolos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Protocolos e Documentos</h1>
+          <p className="text-sm text-muted-foreground mt-1">Prontuário completo do paciente — anamnese, flags, protocolos ativos, histórico de sessões e evolução clínica</p>
           <p className="text-muted-foreground text-sm mt-1">Gestao de protocolos clinicos, relatorios e envio ao paciente</p>
         </div>
       </div>

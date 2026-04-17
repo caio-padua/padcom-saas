@@ -73,7 +73,7 @@ export default function Pacientes() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pacientes</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {filtered.length} paciente{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
+            Cadastro e gerenciamento de pacientes da clínica — {filtered.length} paciente{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -81,15 +81,18 @@ export default function Pacientes() {
             <Button className="gap-2"><Plus className="h-4 w-4" /> Novo Paciente</Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Cadastrar Paciente</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Cadastrar Paciente</DialogTitle>
+              <p className="text-sm text-muted-foreground">Preencha os dados básicos do paciente. Após o cadastro, um link único será gerado para o portal do paciente.</p>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
-              <div className="space-y-2"><Label>Nome Completo *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do paciente" /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">Nome Completo *</Label><p className="text-xs text-muted-foreground">Nome civil completo conforme documento de identidade</p><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do paciente" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm(f => ({ ...f, cpf: e.target.value }))} placeholder="000.000.000-00" /></div>
-                <div className="space-y-2"><Label>Data Nasc.</Label><Input type="date" value={form.birthDate} onChange={e => setForm(f => ({ ...f, birthDate: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">CPF</Label><p className="text-xs text-muted-foreground">Cadastro de Pessoa Física — usado para identificação única</p><Input value={form.cpf} onChange={e => setForm(f => ({ ...f, cpf: e.target.value }))} placeholder="000.000.000-00" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Data de Nascimento</Label><p className="text-xs text-muted-foreground">Necessária para cálculo de idade e protocolos etários</p><Input type="date" value={form.birthDate} onChange={e => setForm(f => ({ ...f, birthDate: e.target.value }))} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Sexo</Label>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Sexo Biológico</Label><p className="text-xs text-muted-foreground">Sexo biológico — relevante para protocolos hormonais e dosagens</p>
                   <Select value={form.sex} onValueChange={v => setForm(f => ({ ...f, sex: v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
@@ -99,9 +102,9 @@ export default function Pacientes() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Telefone</Label><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="(00) 00000-0000" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Telefone / WhatsApp</Label><p className="text-xs text-muted-foreground">Número principal para contato e envio de link do portal</p><Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="(00) 00000-0000" /></div>
               </div>
-              <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@exemplo.com" /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">E-mail</Label><p className="text-xs text-muted-foreground">E-mail para envio de receitas, relatórios e comunicações clínicas</p><Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@exemplo.com" /></div>
               <Button onClick={handleCreate} className="w-full" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Cadastrando..." : "Cadastrar Paciente"}
               </Button>
@@ -133,7 +136,8 @@ export default function Pacientes() {
           <CardContent className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Status</Label>
+                <Label className="text-xs font-semibold">Status</Label>
+                <p className="text-[10px] text-muted-foreground">Filtrar por pacientes ativos ou inativos</p>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -144,7 +148,8 @@ export default function Pacientes() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Sexo</Label>
+                <Label className="text-xs font-semibold">Sexo</Label>
+                <p className="text-[10px] text-muted-foreground">Filtrar por sexo biológico</p>
                 <Select value={filterSex} onValueChange={setFilterSex}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>

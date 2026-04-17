@@ -43,6 +43,7 @@ export default function FunilPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Funil Comercial</h1>
+        <p className="text-sm text-muted-foreground mt-1">Pipeline de conversão — leads, abandonos, reengajamento e pacientes de alto interesse. Rastreie cada braço de entrada.</p>
         <p className="text-muted-foreground text-sm mt-1">Visão consolidada do funil de conversão, abandono e previsão comercial</p>
       </div>
 

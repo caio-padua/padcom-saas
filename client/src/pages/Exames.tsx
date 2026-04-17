@@ -37,25 +37,28 @@ export default function ExamesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><FlaskConical className="h-6 w-6 text-primary" /> Exames</h1>
-          <p className="text-sm text-muted-foreground mt-1">Registro e acompanhamento de exames laboratoriais</p>
+          <p className="text-sm text-muted-foreground mt-1">Registro e acompanhamento de exames laboratoriais — valores fora da faixa geram alertas automáticos no motor clínico</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="gap-2" disabled={!selectedPatient}><Plus className="h-4 w-4" /> Novo Exame</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Registrar Exame</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Registrar Exame Laboratorial</DialogTitle>
+              <p className="text-sm text-muted-foreground">Registre o resultado de um exame. Valores fora da faixa de referência geram alertas automáticos para a equipe.</p>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Nome do Exame *</Label><Input value={form.examName} onChange={e => setForm(f => ({ ...f, examName: e.target.value }))} placeholder="GGT, TSH, etc." /></div>
-                <div className="space-y-2"><Label>Data *</Label><Input type="date" value={form.examDate} onChange={e => setForm(f => ({ ...f, examDate: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Nome do Exame *</Label><p className="text-xs text-muted-foreground">Biomarcador ou exame — ex: GGT, TSH, Vitamina D, Hemoglobina Glicada</p><Input value={form.examName} onChange={e => setForm(f => ({ ...f, examName: e.target.value }))} placeholder="GGT, TSH, etc." /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Data do Exame *</Label><p className="text-xs text-muted-foreground">Data em que a coleta ou exame foi realizado</p><Input type="date" value={form.examDate} onChange={e => setForm(f => ({ ...f, examDate: e.target.value }))} /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2"><Label>Valor</Label><Input value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Unidade</Label><Input value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Classificação</Label><Input value={form.classification} onChange={e => setForm(f => ({ ...f, classification: e.target.value }))} placeholder="OTIMO" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Valor Resultado</Label><p className="text-xs text-muted-foreground">Valor numérico do resultado do exame</p><Input value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Unidade</Label><p className="text-xs text-muted-foreground">Unidade de medida — mg/dL, ng/mL, UI/L</p><Input value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Classificação</Label><p className="text-xs text-muted-foreground">ÓTIMO, MEDIANO ou BAIXO conforme faixa funcional</p><Input value={form.classification} onChange={e => setForm(f => ({ ...f, classification: e.target.value }))} placeholder="OTIMO" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Ref. Mín.</Label><Input value={form.referenceMin} onChange={e => setForm(f => ({ ...f, referenceMin: e.target.value }))} /></div>
-                <div className="space-y-2"><Label>Ref. Máx.</Label><Input value={form.referenceMax} onChange={e => setForm(f => ({ ...f, referenceMax: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Referência Mínima</Label><p className="text-xs text-muted-foreground">Limite inferior da faixa de referência funcional</p><Input value={form.referenceMin} onChange={e => setForm(f => ({ ...f, referenceMin: e.target.value }))} /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Referência Máxima</Label><p className="text-xs text-muted-foreground">Limite superior da faixa de referência funcional</p><Input value={form.referenceMax} onChange={e => setForm(f => ({ ...f, referenceMax: e.target.value }))} /></div>
               </div>
               <Button onClick={handleCreate} className="w-full" disabled={createMutation.isPending}>Registrar</Button>
             </div>

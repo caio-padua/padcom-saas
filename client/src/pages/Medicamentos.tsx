@@ -29,6 +29,7 @@ export default function MedicamentosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Medicamentos</h1>
+          <p className="text-sm text-muted-foreground mt-1">Catálogo de medicamentos e fórmulas disponíveis — base para prescrições e Score Competência Reguladora</p>
           <p className="text-muted-foreground text-sm mt-1">Matriz dosada por período — manhã, tarde e noite</p>
         </div>
         {selectedPatient && (

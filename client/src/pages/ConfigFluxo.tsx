@@ -28,6 +28,7 @@ export default function ConfigFluxoPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Configuração de Fluxo</h1>
+        <p className="text-sm text-muted-foreground mt-1">Parâmetros do motor clínico — intervalos de retorno, limites de alerta, automação de follow-up</p>
         <p className="text-muted-foreground text-sm mt-1">Governança clínica — controle quais etapas são obrigatórias e quais podem ser automatizadas</p>
       </div>
 

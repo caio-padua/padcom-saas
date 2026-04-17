@@ -38,6 +38,7 @@ export default function FlagsClinicasPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Flags Clínicas</h1>
+        <p className="text-sm text-muted-foreground mt-1">Marcadores clínicos do paciente — alergias, condições, riscos e observações importantes para a equipe</p>
         <p className="text-muted-foreground text-sm mt-1">Validação humana de condições críticas detectadas pelo motor de score</p>
       </div>
 

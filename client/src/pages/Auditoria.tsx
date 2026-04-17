@@ -18,7 +18,7 @@ export default function AuditoriaPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Activity className="h-6 w-6 text-primary" /> Auditoria</h1>
-        <p className="text-sm text-muted-foreground mt-1">Log completo de ações realizadas no sistema</p>
+        <p className="text-sm text-muted-foreground mt-1">Log completo de ações realizadas no sistema — rastreabilidade total para governança e compliance</p>
       </div>
 
       {isLoading ? <div className="text-center p-8 text-muted-foreground">Carregando...</div> : !logs?.length ? (

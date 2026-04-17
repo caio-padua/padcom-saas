@@ -45,6 +45,7 @@ export default function Polifarmacia() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Polifarmácia</h1>
+          <p className="text-sm text-muted-foreground mt-1">Regras de interação medicamentosa — detecta combinações perigosas e gera alertas automáticos para a equipe clínica</p>
           <p className="text-muted-foreground text-sm mt-1">Regras de interação medicamentosa e limiares de polifarmácia</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -48,27 +48,30 @@ export default function Prescricoes() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Pill className="h-6 w-6 text-primary" /> Prescrições</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie fórmulas e componentes prescritos</p>
+          <p className="text-sm text-muted-foreground mt-1">Gerencie fórmulas magistrais, medicamentos e componentes prescritos — cada prescrição é validada pelo Score Competência Reguladora</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button className="gap-2" disabled={!selectedPatient}><Plus className="h-4 w-4" /> Nova Prescrição</Button></DialogTrigger>
           <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nova Prescrição</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Nova Prescrição</DialogTitle>
+              <p className="text-sm text-muted-foreground">Crie uma prescrição com fórmula, componentes e posologia. O nível de validação será determinado pelo Score Regulatório dos itens.</p>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Código *</Label><Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="FRM-001" /></div>
-                <div className="space-y-2"><Label>Nome *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome da fórmula" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Código *</Label><p className="text-xs text-muted-foreground">Identificador único da fórmula — ex: FRM-001, PRO-042</p><Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="FRM-001" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Nome da Fórmula *</Label><p className="text-xs text-muted-foreground">Nome descritivo da prescrição para identificação rápida</p><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome da fórmula" /></div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2"><Label>Via</Label><Input value={form.via} onChange={e => setForm(f => ({ ...f, via: e.target.value }))} placeholder="Oral" /></div>
-                <div className="space-y-2"><Label>Forma</Label><Input value={form.form} onChange={e => setForm(f => ({ ...f, form: e.target.value }))} placeholder="Cápsula" /></div>
-                <div className="space-y-2"><Label>Dosagem</Label><Input value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="500mg" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Via de Administração</Label><p className="text-xs text-muted-foreground">Como o paciente vai tomar — oral, IV, IM, tópico</p><Input value={form.via} onChange={e => setForm(f => ({ ...f, via: e.target.value }))} placeholder="Oral" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Forma Farmacêutica</Label><p className="text-xs text-muted-foreground">Cápsula, comprimido, solução, creme, etc.</p><Input value={form.form} onChange={e => setForm(f => ({ ...f, form: e.target.value }))} placeholder="Cápsula" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Dosagem Total</Label><p className="text-xs text-muted-foreground">Dose por unidade — ex: 500mg, 10ml</p><Input value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="500mg" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Frequência</Label><Input value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))} placeholder="2x ao dia" /></div>
-                <div className="space-y-2"><Label>Duração</Label><Input value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} placeholder="30 dias" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Frequência / Posologia</Label><p className="text-xs text-muted-foreground">Quantas vezes ao dia e em qual horário</p><Input value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))} placeholder="2x ao dia" /></div>
+                <div className="space-y-1"><Label className="text-sm font-semibold">Duração do Tratamento</Label><p className="text-xs text-muted-foreground">Período total de uso — ex: 30 dias, 3 meses, contínuo</p><Input value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} placeholder="30 dias" /></div>
               </div>
-              <div className="space-y-2"><Label>Objetivo</Label><Textarea value={form.objective} onChange={e => setForm(f => ({ ...f, objective: e.target.value }))} rows={2} /></div>
+              <div className="space-y-1"><Label className="text-sm font-semibold">Objetivo Terapêutico</Label><p className="text-xs text-muted-foreground">Finalidade clínica da prescrição — ex: redução de estresse oxidativo, suporte mitocondrial</p><Textarea value={form.objective} onChange={e => setForm(f => ({ ...f, objective: e.target.value }))} rows={2} /></div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between"><Label>Componentes</Label><Button variant="outline" size="sm" onClick={() => setComponents(c => [...c, { componentName: "", dosage: "", unit: "" }])}><Plus className="h-3 w-3 mr-1" /> Adicionar</Button></div>
                 {components.map((comp, i) => (

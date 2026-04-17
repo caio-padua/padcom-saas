@@ -28,6 +28,7 @@ export default function MotorAcoesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Motor de Ações</h1>
+          <p className="text-sm text-muted-foreground mt-1">Regras automáticas de scoring — pesos por categoria, faixas de classificação e gatilhos de alerta</p>
           <p className="text-muted-foreground text-sm mt-1">Regras automáticas: quando um código é acionado, dispara ações configuráveis</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>

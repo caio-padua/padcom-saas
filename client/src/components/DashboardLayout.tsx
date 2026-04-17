@@ -26,7 +26,7 @@ import {
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
   UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
   Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle,
-  Building2, Cog, Filter
+  Building2, Cog, Filter, BarChart3, Store, ShieldCheck, Webhook, Scale
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -56,6 +56,11 @@ const menuItems = [
   { icon: AlertTriangle, label: "Polifarmácia", path: "/polifarmacia" },
   { icon: FileText, label: "Protocolos", path: "/protocolos" },
   { icon: Building2, label: "Clínicas", path: "/clinicas" },
+  { icon: BarChart3, label: "Governança", path: "/governanca" },
+  { icon: Store, label: "Farmácias", path: "/farmacias" },
+  { icon: ShieldCheck, label: "Confiança", path: "/confianca" },
+  { icon: Webhook, label: "Webhooks", path: "/webhooks" },
+  { icon: Scale, label: "Score Regulatório", path: "/score-regulatorio" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 

@@ -6,7 +6,11 @@ import {
   dailyReports, prescriptionReports, alerts, alertRules, followUpSessions,
   exams, auditLog, scoringWeights, scoringBands, motorActions, clinicalFlags,
   funnelStatus, medications, flowConfig, clinicalSystems, sleepDetails,
-  physicalActivityDetails, polypharmacyRules, teamQueue, protocolDocuments, clinics
+  physicalActivityDetails, polypharmacyRules, teamQueue, protocolDocuments, clinics,
+  entryChannels, entryLeads, pharmacies, prescriptionDispatches,
+  validationCascade, professionalTrust, validationConfig,
+  conductGrades, webhookEndpoints, recipeDeliveryConfig, quickAnamnesisTemplates,
+  regulatoryCompetence
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -579,4 +583,388 @@ export async function getClinicById(id: number) {
 export async function updateClinic(id: number, data: Partial<{ name: string; slug: string; logoUrl: string; primaryColor: string; secondaryColor: string; phone: string; email: string; address: string; cnpj: string; plan: "starter" | "pro" | "enterprise"; maxPatients: number; maxConsultants: number; isActive: boolean }>) {
   const db = await getDb(); if (!db) return;
   await db.update(clinics).set(data).where(eq(clinics.id, id));
+}
+
+// ═══════════════════════════════════════════════════════════
+// V10 — BRAÇOS DE ENTRADA + GOVERNANÇA + DISPATCHER FARMÁCIA
+// ═══════════════════════════════════════════════════════════
+
+// ─── ENTRY CHANNEL HELPERS ────────────────────────────────────
+export async function listEntryChannels(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(entryChannels).where(eq(entryChannels.clinicId, clinicId)).orderBy(desc(entryChannels.createdAt));
+  return db.select().from(entryChannels).orderBy(desc(entryChannels.createdAt));
+}
+
+export async function createEntryChannel(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(entryChannels).values(data);
+  return r[0].insertId;
+}
+
+export async function updateEntryChannel(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(entryChannels).set(data).where(eq(entryChannels.id, id));
+}
+
+export async function deleteEntryChannel(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(entryChannels).where(eq(entryChannels.id, id));
+}
+
+// ─── ENTRY LEAD HELPERS ──────────────────────────────────────
+export async function listEntryLeads(opts?: { clinicId?: number; channelType?: string; status?: string; limit?: number }) {
+  const db = await getDb(); if (!db) return [];
+  const conditions: any[] = [];
+  if (opts?.clinicId) conditions.push(eq(entryLeads.clinicId, opts.clinicId));
+  if (opts?.channelType) conditions.push(eq(entryLeads.channelType, opts.channelType as any));
+  if (opts?.status) conditions.push(eq(entryLeads.status, opts.status as any));
+  const query = conditions.length > 0
+    ? db.select().from(entryLeads).where(and(...conditions)).orderBy(desc(entryLeads.createdAt))
+    : db.select().from(entryLeads).orderBy(desc(entryLeads.createdAt));
+  return opts?.limit ? query.limit(opts.limit) : query;
+}
+
+export async function createEntryLead(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(entryLeads).values(data);
+  return r[0].insertId;
+}
+
+export async function updateEntryLead(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(entryLeads).set(data).where(eq(entryLeads.id, id));
+}
+
+export async function getEntryLead(id: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(entryLeads).where(eq(entryLeads.id, id)).limit(1);
+  return r[0] ?? undefined;
+}
+
+export async function getLeadStats(clinicId?: number) {
+  const db = await getDb(); if (!db) return {};
+  const conditions = clinicId ? [eq(entryLeads.clinicId, clinicId)] : [];
+  const allLeads = conditions.length > 0
+    ? await db.select().from(entryLeads).where(and(...conditions))
+    : await db.select().from(entryLeads);
+
+  const byChannel: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  for (const lead of allLeads) {
+    byChannel[lead.channelType] = (byChannel[lead.channelType] || 0) + 1;
+    byStatus[lead.status] = (byStatus[lead.status] || 0) + 1;
+  }
+  return { total: allLeads.length, byChannel, byStatus };
+}
+
+// ─── PHARMACY HELPERS ─────────────────────────────────────────
+export async function listPharmacies(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(pharmacies).where(eq(pharmacies.clinicId, clinicId)).orderBy(desc(pharmacies.createdAt));
+  return db.select().from(pharmacies).orderBy(desc(pharmacies.createdAt));
+}
+
+export async function createPharmacy(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(pharmacies).values(data);
+  return r[0].insertId;
+}
+
+export async function updatePharmacy(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(pharmacies).set(data).where(eq(pharmacies.id, id));
+}
+
+export async function getPharmacy(id: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(pharmacies).where(eq(pharmacies.id, id)).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ─── PRESCRIPTION DISPATCH HELPERS ────────────────────────────
+export async function listDispatches(opts?: { prescriptionId?: number; pharmacyId?: number; status?: string; clinicId?: number }) {
+  const db = await getDb(); if (!db) return [];
+  const conditions: any[] = [];
+  if (opts?.prescriptionId) conditions.push(eq(prescriptionDispatches.prescriptionId, opts.prescriptionId));
+  if (opts?.pharmacyId) conditions.push(eq(prescriptionDispatches.pharmacyId, opts.pharmacyId));
+  if (opts?.status) conditions.push(eq(prescriptionDispatches.status, opts.status as any));
+  if (opts?.clinicId) conditions.push(eq(prescriptionDispatches.clinicId, opts.clinicId));
+  if (conditions.length > 0) return db.select().from(prescriptionDispatches).where(and(...conditions)).orderBy(desc(prescriptionDispatches.createdAt));
+  return db.select().from(prescriptionDispatches).orderBy(desc(prescriptionDispatches.createdAt));
+}
+
+export async function createDispatch(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(prescriptionDispatches).values(data);
+  return r[0].insertId;
+}
+
+export async function updateDispatch(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(prescriptionDispatches).set(data).where(eq(prescriptionDispatches.id, id));
+}
+
+export async function getDispatch(id: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(prescriptionDispatches).where(eq(prescriptionDispatches.id, id)).limit(1);
+  return r[0] ?? undefined;
+}
+
+export async function getDispatchStats(clinicId?: number) {
+  const db = await getDb(); if (!db) return {};
+  const conditions = clinicId ? [eq(prescriptionDispatches.clinicId, clinicId)] : [];
+  const allDispatches = conditions.length > 0
+    ? await db.select().from(prescriptionDispatches).where(and(...conditions))
+    : await db.select().from(prescriptionDispatches);
+
+  const byStatus: Record<string, number> = {};
+  let totalValue = 0;
+  let totalCommission = 0;
+  for (const d of allDispatches) {
+    byStatus[d.status] = (byStatus[d.status] || 0) + 1;
+    totalValue += Number(d.totalValue || 0);
+    totalCommission += Number(d.commissionValue || 0);
+  }
+  return { total: allDispatches.length, byStatus, totalValue, totalCommission };
+}
+
+// ─── VALIDATION CASCADE HELPERS ───────────────────────────────
+export async function listValidationCascade(opts?: { entityType?: string; entityId?: number; patientId?: number; status?: string; clinicId?: number }) {
+  const db = await getDb(); if (!db) return [];
+  const conditions: any[] = [];
+  if (opts?.entityType) conditions.push(eq(validationCascade.entityType, opts.entityType as any));
+  if (opts?.entityId) conditions.push(eq(validationCascade.entityId, opts.entityId));
+  if (opts?.patientId) conditions.push(eq(validationCascade.patientId, opts.patientId));
+  if (opts?.status) conditions.push(eq(validationCascade.status, opts.status as any));
+  if (opts?.clinicId) conditions.push(eq(validationCascade.clinicId, opts.clinicId));
+  if (conditions.length > 0) return db.select().from(validationCascade).where(and(...conditions)).orderBy(desc(validationCascade.createdAt));
+  return db.select().from(validationCascade).orderBy(desc(validationCascade.createdAt));
+}
+
+export async function createValidationEntry(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(validationCascade).values(data);
+  return r[0].insertId;
+}
+
+export async function updateValidationEntry(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(validationCascade).set(data).where(eq(validationCascade.id, id));
+}
+
+export async function getValidationEntry(id: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(validationCascade).where(eq(validationCascade.id, id)).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ─── PROFESSIONAL TRUST HELPERS ───────────────────────────────
+export async function listProfessionalTrust(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(professionalTrust).where(eq(professionalTrust.clinicId, clinicId)).orderBy(desc(professionalTrust.createdAt));
+  return db.select().from(professionalTrust).orderBy(desc(professionalTrust.createdAt));
+}
+
+export async function createProfessionalTrust(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(professionalTrust).values(data);
+  return r[0].insertId;
+}
+
+export async function updateProfessionalTrust(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(professionalTrust).set(data).where(eq(professionalTrust.id, id));
+}
+
+export async function getProfessionalTrustByProfessional(professionalId: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(professionalTrust).where(and(eq(professionalTrust.professionalId, professionalId), eq(professionalTrust.isActive, true))).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ─── VALIDATION CONFIG HELPERS ────────────────────────────────
+export async function listValidationConfig(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(validationConfig).where(eq(validationConfig.clinicId, clinicId)).orderBy(desc(validationConfig.createdAt));
+  return db.select().from(validationConfig).orderBy(desc(validationConfig.createdAt));
+}
+
+export async function createValidationConfig(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(validationConfig).values(data);
+  return r[0].insertId;
+}
+
+export async function updateValidationConfig(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(validationConfig).set(data).where(eq(validationConfig.id, id));
+}
+
+export async function getValidationConfigForItem(itemType: string, clinicId?: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const conditions = [eq(validationConfig.itemType, itemType)];
+  if (clinicId) conditions.push(eq(validationConfig.clinicId, clinicId));
+  const r = await db.select().from(validationConfig).where(and(...conditions)).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ═══════════════════════════════════════════════════════════
+// V10.1 — GRAUS DE CONDUTA + WEBHOOK + DELIVERY CONFIG
+// ═══════════════════════════════════════════════════════════
+
+// ─── CONDUCT GRADE HELPERS ────────────────────────────────────
+export async function listConductGrades(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(conductGrades).where(eq(conductGrades.clinicId, clinicId)).orderBy(asc(conductGrades.sortOrder));
+  return db.select().from(conductGrades).orderBy(asc(conductGrades.sortOrder));
+}
+
+export async function createConductGrade(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(conductGrades).values(data);
+  return r[0].insertId;
+}
+
+export async function updateConductGrade(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(conductGrades).set(data).where(eq(conductGrades.id, id));
+}
+
+// ─── WEBHOOK ENDPOINT HELPERS ─────────────────────────────────
+export async function listWebhookEndpoints(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(webhookEndpoints).where(eq(webhookEndpoints.clinicId, clinicId)).orderBy(desc(webhookEndpoints.createdAt));
+  return db.select().from(webhookEndpoints).orderBy(desc(webhookEndpoints.createdAt));
+}
+
+export async function createWebhookEndpoint(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(webhookEndpoints).values(data);
+  return r[0].insertId;
+}
+
+export async function updateWebhookEndpoint(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(webhookEndpoints).set(data).where(eq(webhookEndpoints.id, id));
+}
+
+export async function getWebhookEndpointByToken(token: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(webhookEndpoints).where(eq(webhookEndpoints.secretToken, token)).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ─── RECIPE DELIVERY CONFIG HELPERS ───────────────────────────
+export async function getRecipeDeliveryConfig(clinicId?: number) {
+  const db = await getDb(); if (!db) return undefined;
+  if (clinicId) {
+    const r = await db.select().from(recipeDeliveryConfig).where(eq(recipeDeliveryConfig.clinicId, clinicId)).limit(1);
+    return r[0] ?? undefined;
+  }
+  const r = await db.select().from(recipeDeliveryConfig).limit(1);
+  return r[0] ?? undefined;
+}
+
+export async function upsertRecipeDeliveryConfig(data: any) {
+  const db = await getDb(); if (!db) return null;
+  // Try to find existing
+  const existing = data.clinicId
+    ? await db.select().from(recipeDeliveryConfig).where(eq(recipeDeliveryConfig.clinicId, data.clinicId)).limit(1)
+    : await db.select().from(recipeDeliveryConfig).limit(1);
+  if (existing[0]) {
+    await db.update(recipeDeliveryConfig).set(data).where(eq(recipeDeliveryConfig.id, existing[0].id));
+    return existing[0].id;
+  }
+  const r = await db.insert(recipeDeliveryConfig).values(data);
+  return r[0].insertId;
+}
+
+// ─── QUICK ANAMNESIS TEMPLATE HELPERS ─────────────────────────
+export async function listQuickAnamnesisTemplates(clinicId?: number) {
+  const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(quickAnamnesisTemplates).where(eq(quickAnamnesisTemplates.clinicId, clinicId)).orderBy(desc(quickAnamnesisTemplates.createdAt));
+  return db.select().from(quickAnamnesisTemplates).orderBy(desc(quickAnamnesisTemplates.createdAt));
+}
+
+export async function createQuickAnamnesisTemplate(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(quickAnamnesisTemplates).values(data);
+  return r[0].insertId;
+}
+
+export async function updateQuickAnamnesisTemplate(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(quickAnamnesisTemplates).set(data).where(eq(quickAnamnesisTemplates.id, id));
+}
+
+// ─── REGULATORY COMPETENCE (Score Competência Reguladora) ─────
+export async function listRegulatoryCompetence(opts?: { clinicId?: number; category?: string; validationLevel?: string }) {
+  const db = await getDb(); if (!db) return [];
+  const conditions: any[] = [eq(regulatoryCompetence.isActive, true)];
+  if (opts?.clinicId) conditions.push(eq(regulatoryCompetence.clinicId, opts.clinicId));
+  if (opts?.category) conditions.push(eq(regulatoryCompetence.itemCategory, opts.category as any));
+  if (opts?.validationLevel) conditions.push(eq(regulatoryCompetence.autoValidationLevel, opts.validationLevel as any));
+  return db.select().from(regulatoryCompetence).where(and(...conditions)).orderBy(regulatoryCompetence.regulatoryScore);
+}
+
+export async function getRegulatoryCompetence(id: number) {
+  const db = await getDb(); if (!db) return null;
+  const [row] = await db.select().from(regulatoryCompetence).where(eq(regulatoryCompetence.id, id)).limit(1);
+  return row ?? null;
+}
+
+export async function createRegulatoryCompetence(data: {
+  itemName: string; itemCategory: string; administrationRoute: string;
+  regulatoryScore: number; canMedico?: boolean; canEnfermeiro?: boolean;
+  canFarmaceutico?: boolean; canBiomedico?: boolean; canNutricionista?: boolean;
+  canPsicologo?: boolean; requiresCRM?: boolean; requiresSpecialPrescription?: boolean;
+  prescriptionType?: string; autoValidationLevel: string;
+  regulatoryNotes?: string; legalBasis?: string; exampleDosage?: string;
+  therapeuticGroup?: string; clinicId?: number;
+}) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  const [result] = await db.insert(regulatoryCompetence).values(data as any);
+  return { id: result.insertId, ...data };
+}
+
+export async function updateRegulatoryCompetence(id: number, data: Partial<{
+  itemName: string; itemCategory: string; administrationRoute: string;
+  regulatoryScore: number; canMedico: boolean; canEnfermeiro: boolean;
+  canFarmaceutico: boolean; canBiomedico: boolean; canNutricionista: boolean;
+  canPsicologo: boolean; requiresCRM: boolean; requiresSpecialPrescription: boolean;
+  prescriptionType: string; autoValidationLevel: string;
+  regulatoryNotes: string; legalBasis: string; exampleDosage: string;
+  therapeuticGroup: string; isActive: boolean; clinicId: number;
+}>) {
+  const db = await getDb(); if (!db) throw new Error("DB not available");
+  await db.update(regulatoryCompetence).set(data as any).where(eq(regulatoryCompetence.id, id));
+  return getRegulatoryCompetence(id);
+}
+
+// Motor de resolução: dado item + profissional → pode/não pode + nível
+export async function resolveCompetence(itemId: number, professionalRole: string) {
+  const item = await getRegulatoryCompetence(itemId);
+  if (!item) return { allowed: false, reason: "Item não encontrado", level: "N3" as const };
+  
+  const roleMap: Record<string, keyof typeof item> = {
+    medico: "canMedico", medico_consultor: "canMedico", medico_assistente: "canMedico",
+    enfermeiro: "canEnfermeiro", farmaceutico: "canFarmaceutico",
+    biomedico: "canBiomedico", nutricionista: "canNutricionista",
+    psicologo: "canPsicologo",
+  };
+  
+  const field = roleMap[professionalRole];
+  const allowed = field ? Boolean(item[field]) : false;
+  
+  return {
+    allowed,
+    reason: allowed 
+      ? `${professionalRole} pode prescrever ${item.itemName}`
+      : `${professionalRole} NÃO pode prescrever ${item.itemName}. Requer: ${item.requiresCRM ? "CRM médico" : "profissional habilitado"}`,
+    level: item.autoValidationLevel as "N1" | "N2" | "N3",
+    requiresCRM: item.requiresCRM,
+    prescriptionType: item.prescriptionType,
+    regulatoryScore: item.regulatoryScore,
+  };
 }

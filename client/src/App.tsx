@@ -34,6 +34,11 @@ const FilaEquipe = lazy(() => import("./pages/FilaEquipe"));
 const Polifarmacia = lazy(() => import("./pages/Polifarmacia"));
 const Protocolos = lazy(() => import("./pages/Protocolos"));
 const Clinicas = lazy(() => import("./pages/Clinicas"));
+const Governanca = lazy(() => import("./pages/Governanca"));
+const Farmacias = lazy(() => import("./pages/Farmacias"));
+const Confianca = lazy(() => import("./pages/Confianca"));
+const WebhooksPage = lazy(() => import("./pages/Webhooks"));
+const ScoreRegulatorio = lazy(() => import("./pages/ScoreRegulatorio"));
 
 function PageLoader() {
   return (
@@ -72,6 +77,11 @@ function DashboardRouter() {
           <Route path="/polifarmacia" component={Polifarmacia} />
           <Route path="/protocolos" component={Protocolos} />
           <Route path="/clinicas" component={Clinicas} />
+          <Route path="/governanca" component={Governanca} />
+          <Route path="/farmacias" component={Farmacias} />
+          <Route path="/confianca" component={Confianca} />
+          <Route path="/webhooks" component={WebhooksPage} />
+          <Route path="/score-regulatorio" component={ScoreRegulatorio} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

@@ -55,6 +55,7 @@ export default function FilaEquipe() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Fila da Equipe</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gestão de atendimentos — pacientes aguardando, em atendimento e finalizados. Atribua profissionais e acompanhe prioridades.</p>
           <p className="text-muted-foreground text-sm mt-1">Gestão de atendimentos segmentada por perfil profissional</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

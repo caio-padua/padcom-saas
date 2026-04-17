@@ -7,6 +7,14 @@ import { nanoid } from "nanoid";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
 import { calculateScore, calculateScoreFromSession } from "./scoring-engine";
+import {
+  entryChannelRouter, entryLeadRouter, pharmacyRouter, dispatchRouter,
+  validationCascadeRouter, professionalTrustRouter, validationConfigRouter
+} from "./routers-v10";
+import {
+  conductGradeRouter, webhookEndpointRouter, webhookIntakeRouter,
+  recipeDeliveryRouter, quickAnamnesisRouter, regulatoryCompetenceRouter
+} from "./routers-v10-1";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao administrador" });
@@ -23,6 +31,8 @@ const patientRouter = router({
     sex: z.enum(["M", "F", "O"]).optional(), phone: z.string().optional(),
     email: z.string().optional(), notes: z.string().optional(),
     clinicId: z.number().optional(),
+    entryChannel: z.enum(["trafego_pago", "consultora", "site", "vendedor_externo", "referral", "whatsapp_bot", "direto"]).optional(),
+    entryLeadId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const token = nanoid(32);
     const id = await db.createPatient({ ...input, accessToken: token, createdById: ctx.user.id });
@@ -820,6 +830,21 @@ export const appRouter = router({
   teamQueue: teamQueueRouter,
   protocolDocument: protocolDocumentRouter,
   clinic: clinicRouter,
+  // V10 — Braços de Entrada + Governança + Dispatcher
+  entryChannel: entryChannelRouter,
+  entryLead: entryLeadRouter,
+  pharmacy: pharmacyRouter,
+  dispatch: dispatchRouter,
+  validationCascade: validationCascadeRouter,
+  professionalTrust: professionalTrustRouter,
+  validationConfig: validationConfigRouter,
+  // V10.1 — Graus de Conduta + Webhook + Auto-Dispatch
+  conductGrade: conductGradeRouter,
+  webhookEndpoint: webhookEndpointRouter,
+  webhookIntake: webhookIntakeRouter,
+  recipeDelivery: recipeDeliveryRouter,
+  quickAnamnesis: quickAnamnesisRouter,
+  regulatoryCompetence: regulatoryCompetenceRouter,
 });
 
 export type AppRouter = typeof appRouter;

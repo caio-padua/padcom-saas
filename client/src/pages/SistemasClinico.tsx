@@ -64,6 +64,7 @@ export default function SistemasClinico() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Painéis por Sistema Clínico</h1>
+          <p className="text-sm text-muted-foreground mt-1">Visão por sistema orgânico — endócrino, imunológico, cardiovascular, etc. Cada painel agrupa exames e condutas relacionadas.</p>
           <p className="text-muted-foreground text-sm mt-1">Visão matricial das condições do paciente por sistema orgânico</p>
         </div>
       </div>

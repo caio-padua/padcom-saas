@@ -178,7 +178,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 156 testes passando (9 arquivos de teste, incluindo testes de anastomose)
+- [x] 201 testes passando (9 arquivos de teste, incluindo V10 + anastomose)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
@@ -215,3 +215,89 @@
 - [x] Plano de transplante em 4 fases (Preparação, Adaptadores, Enxerto, Validação)
 - [x] 18 testes semânticos de anastomose passando (nomenclatura, aliases, compatibilidade, riscos)
 - [x] Documento completo em docs/ANASTOMOSE-NUCLEO.md
+
+## ═══════════════════════════════════════════════════════════
+## V10 — BRAÇOS DE ENTRADA + GOVERNANÇA + DISPATCHER FARMÁCIA
+## ═══════════════════════════════════════════════════════════
+
+## Schema V10 — Novas Tabelas
+- [x] Tabela entry_channels: canais de entrada (trafego_pago, consultora, site, vendedor, referral, whatsapp_bot) com rastreio UTM
+- [x] Tabela entry_leads: leads capturados por qualquer braço com canal, status funil, dados de contato, UTM source/medium/campaign
+- [x] Tabela pharmacies: farmácias parceiras (nome, CNPJ, email, comissão %, modelo integração, capacidades JSONB)
+- [x] Tabela prescription_dispatches: despachos de prescrição para farmácia (prescriptionId, pharmacyId, status, valor, comissão)
+- [x] Tabela validation_cascade: cascata de validação (entidadeId, tipo, etapa, profissionalId, certificadoDigital, status, observação)
+- [x] Tabela professional_trust: delegação de confiança (profissionalId, delegadoPorId, nivelConfianca, CRM, ativo)
+- [x] Tabela validation_config: config de validação por item (itemTipo, exigeValidacaoHumana toggle, nivelMinimoCRM)
+- [x] Campo origemCanal + entryLeadId em patients para rastrear de qual braço veio
+
+## Braços de Entrada (E1-E6)
+- [x] E1: Tráfego pago → Beacon/Linktree → anamnese autônoma (link parametrizado com UTM) — schema + router entryChannel + entryLead
+- [x] E2: Consultora/Assistente inicia pelo paciente (braço interno com atribuição) — schema + router
+- [x] E3: Paciente solicita pelo site (autoatendimento com captação de dados) — schema + router
+- [x] E4: Vendedor externo envia link personalizado (link com vendedorId para rastreio e comissão) — schema + router
+- [x] E5: Indicação de paciente existente (referral com código + rastreio + bonificação) — schema + router
+- [x] E6: WhatsApp Bot → triagem → anamnese (entrada via webhook simulado) — schema + router
+
+## Dashboard Global de Governança
+- [x] Visão consolidada de TODAS as entradas por canal (E1-E6) com contadores em tempo real — página Governanca.tsx
+- [x] Filtros por canal, período, status, clínica
+- [x] Métricas de conversão por canal (lead → anamnese → prescrição → venda)
+- [x] Ranking de canais por performance (ROI, conversão, ticket médio)
+- [x] Visão de auditor: 1 dashboard para verificar todas as entradas independente
+- [x] Rastreabilidade completa: de onde veio → o que fez → quanto gerou
+
+## Cascata de Validação com Certificado Digital
+- [x] Fluxo: Enfermeira/Biomédica faz anamnese → registro com certificado digital dela — validation_cascade + router
+- [x] Médico delegado valida (1a lupa) → registro com CRM dele — validation_cascade
+- [x] Preceptor/CRM chefe valida final (microscópio) → registro com CRM final — validation_cascade
+- [x] Toggle de delegação de confiança: preceptor pode delegar validação final para médico consultor — página Confianca.tsx
+- [x] Toggle de validação humana por tipo de item (ex: CoQ10 100mg oral → pode dispensar CRM) — validation_config router
+- [x] Quando delegado: certificado digital do médico delegado aparece como validador final
+- [x] Quando preceptor valida: aparece "Validado por Dr. [Nome] CRM [Número]" com selo
+- [x] Fila de preceptor: casos aguardando validação final com prazo e prioridade
+
+## Dispatcher de Prescrição → Farmácia
+- [x] Motor que pega prescrição validada → monta pedido → despacha para farmácia parceira — router dispatch + autoDispatch
+- [x] Roteamento inteligente: farmácia mais próxima, com capacidade, melhor preço — router dispatch.auto
+- [x] Status do despacho: pendente → enviado → aceito → em_manipulacao → pronto → entregue
+- [x] Dashboard de despachos com volume diário e status por farmácia — página Farmacias.tsx
+- [x] Comissão automática calculada por despacho
+
+## Testes V10
+- [x] 45 testes de braços de entrada E1-E6 (schema, UTM, lead statuses, vendedorId)
+- [x] 9 testes de cascata de validação (enfermeira/médico/preceptor, CRM, certificado digital, delegação)
+- [x] 5 testes de dispatcher farmácia (modelos integração, status lifecycle, comissão)
+- [x] 8 testes de competência regulatória (roles, rotas, riskLevel→N1/N2/N3)
+- [x] 3 testes de webhook intake (ManyChat, Typebot, n8n)
+- [x] 4 testes de recipe delivery config (paciente, farmácia, ambos)
+- [x] 4 testes de graus de conduta N1/N2/N3
+
+## V10.1 — Automação de Fluxo + Graus de Conduta + N1/N2/N3
+- [x] Classificação de condutas em graus por score (grau_1_auto, grau_2_semi, grau_3_manual) — tabela conduct_grades
+- [x] Tabela conduct_grades: faixas de score → grau → nível de validação (N1/N2/N3)
+- [x] N1 (auto): score baixo + item simples → IA valida → gera receita → despacha farmácia automaticamente
+- [x] N2 (semi): score médio → IA valida → precisa 1 clique do consultor delegado
+- [x] N3 (manual): score alto/complexo → cascata completa (enfermeira → médico → preceptor)
+- [x] Toggle de destino da receita: paciente, farmácia, ou ambos (configurável por clínica) — tabela recipe_delivery_config
+- [x] Webhook de entrada para ManyChat/Typebot/Botpress/n8n → cria lead + inicia anamnese rápida — tabela webhook_endpoints + router
+- [x] Anamnese rápida via chatbot: subset de perguntas essenciais para gerar score mínimo
+- [x] Auto-dispatch: prescrição validada N1 → gera receita → envia para farmácia selecionada automaticamente — router autoDispatch
+- [x] Mapeamento de ferramentas de automação compatíveis (ManyChat, Typebot, Botpress, n8n) — página Webhooks.tsx
+
+## V10.2 — Competência Regulatória (Quem Pode Prescrever o Quê)
+- [x] Tabela regulatory_competence: classifica cada tipo de conduta/item por profissional habilitado
+- [x] Categorias de profissional: medico, enfermeiro, farmaceutico, biomedico, nutricionista, psicologo
+- [x] Categorias de via: oral, injetavel, topico, implante, inalatorio, sublingual
+- [x] Regra: item injetável = somente médico; item oral simples = farmacêutico pode; etc.
+- [x] Score de competência: cada conduta recebe riskLevel que determina N1/N2/N3 automaticamente
+- [x] Motor de resolução: router regulatoryCompetence.resolve retorna requiredRole, requiresCRM, canAutoDispatch, riskLevel
+- [x] Frontend: página Score Competência Reguladora com CRUD completo — ScoreRegulatorio.tsx
+- [x] Integração com conduct_grades: riskLevel baixo=N1, medio=N2, alto/critico=N3
+- [x] Seed com 8 regras iniciais de condutas comuns (CoQ10 oral/IV, Vitamina C oral/IV, Glutationa IV, etc.)
+
+## V10.3 — UX: Subtítulos Explicativos em Todos os Campos
+- [x] Renomear para "Score Competência Reguladora" no frontend — ScoreRegulatorio.tsx
+- [x] Subtítulos/descrições explicativas em TODOS os campos de 20+ páginas
+- [x] Varredura completa: Pacientes, Consultoras, Prescrições, Exames, Sessões, Alertas, RelatosDiarios, Clínicas, Governança, Farmácias, Confiança, Webhooks, ScoreRegulatorio, Medicamentos, MotorAcoes, FlagsClinicas, ConfigFluxo, SistemasClinico, FilaEquipe, Funil, Polifarmacia, Protocolos, Auditoria, Evolução, Perguntas
+- [x] Cada campo: Label font-semibold + text-xs text-muted-foreground abaixo
+- [x] Página Score Competência Reguladora com CRUD completo + motor de resolução

@@ -109,7 +109,7 @@ export default function PerguntasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><ClipboardList className="h-6 w-6 text-primary" /> Perguntas da Anamnese</h1>
-          <p className="text-sm text-muted-foreground mt-1">CRUD completo com campos semânticos V15 — code, bloco clínico, peso, vídeo explicativo</p>
+          <p className="text-sm text-muted-foreground mt-1">Banco de perguntas da anamnese — cada pergunta tem código semântico, bloco clínico, peso no scoring e vídeo explicativo</p>
         </div>
         <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> Nova Pergunta</Button></DialogTrigger>

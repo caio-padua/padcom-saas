@@ -58,36 +58,43 @@ export default function Clinicas() {
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Cadastrar Clínica</DialogTitle>
+              <p className="text-sm text-muted-foreground">Crie uma unidade clínica com branding próprio. O slug define a URL do portal do paciente.</p>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Slug (URL)</Label>
+                  <Label className="text-sm font-semibold">Slug (URL) *</Label>
+                  <p className="text-xs text-muted-foreground">Identificador único na URL — só letras minúsculas, números e hífen</p>
                   <Input placeholder="minha-clinica" value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))} />
                   <p className="text-xs text-muted-foreground mt-1">/portal/{form.slug || "..."}</p>
                 </div>
                 <div>
-                  <Label>Nome</Label>
+                  <Label className="text-sm font-semibold">Nome da Clínica *</Label>
+                  <p className="text-xs text-muted-foreground">Nome comercial exibido no portal e relatórios</p>
                   <Input placeholder="Clínica Dr. Padua" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Telefone</Label>
+                  <Label className="text-sm font-semibold">Telefone</Label>
+                  <p className="text-xs text-muted-foreground">Contato principal da unidade</p>
                   <Input placeholder="(11) 99999-9999" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>E-mail</Label>
+                  <Label className="text-sm font-semibold">E-mail</Label>
+                  <p className="text-xs text-muted-foreground">E-mail para comunicações e notificações da clínica</p>
                   <Input type="email" placeholder="contato@clinica.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>CNPJ</Label>
+                  <Label className="text-sm font-semibold">CNPJ</Label>
+                  <p className="text-xs text-muted-foreground">Cadastro Nacional de Pessoa Jurídica da unidade</p>
                   <Input placeholder="00.000.000/0001-00" value={form.cnpj} onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Plano</Label>
+                  <Label className="text-sm font-semibold">Plano</Label>
+                  <p className="text-xs text-muted-foreground">Define limites de pacientes e consultoras</p>
                   <Select value={form.plan} onValueChange={v => setForm(f => ({ ...f, plan: v as any }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -99,7 +106,8 @@ export default function Clinicas() {
                 </div>
               </div>
               <div>
-                <Label>Endereço</Label>
+                <Label className="text-sm font-semibold">Endereço</Label>
+                <p className="text-xs text-muted-foreground">Endereço físico da unidade clínica</p>
                 <Input placeholder="Rua..." value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
