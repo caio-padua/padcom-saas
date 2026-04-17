@@ -723,7 +723,61 @@ const protocolDocumentRouter = router({
   }),
 });
 
-// ─── MAIN ROUTER ───────────────────────────────────────────────
+// ─── CLINIC (multi-tenancy) ──────────────────────────────────────────────
+const clinicRouter = router({
+  list: adminProcedure.query(async () => db.listClinics()),
+  getBySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ input }) => {
+    const clinic = await db.getClinicBySlug(input.slug);
+    if (!clinic) throw new TRPCError({ code: "NOT_FOUND", message: "Clínica não encontrada" });
+    return { id: clinic.id, name: clinic.name, slug: clinic.slug, logoUrl: clinic.logoUrl, primaryColor: clinic.primaryColor, secondaryColor: clinic.secondaryColor, phone: clinic.phone, email: clinic.email, plan: clinic.plan };
+  }),
+  create: adminProcedure.input(z.object({
+    slug: z.string().min(3).max(100).regex(/^[a-z0-9-]+$/),
+    name: z.string().min(2).max(255),
+    logoUrl: z.string().optional(),
+    primaryColor: z.string().optional(),
+    secondaryColor: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    address: z.string().optional(),
+    cnpj: z.string().optional(),
+    plan: z.enum(["starter", "pro", "enterprise"]).optional(),
+    maxPatients: z.number().int().positive().optional(),
+    maxConsultants: z.number().int().positive().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const existing = await db.getClinicBySlug(input.slug);
+    if (existing) throw new TRPCError({ code: "CONFLICT", message: "Slug já em uso" });
+    const id = await db.createClinic({ ...input, ownerUserId: ctx.user.id });
+    await db.logAudit({ userId: ctx.user.id, action: "create", entity: "clinic", entityId: id?.id });
+    return id;
+  }),
+  update: adminProcedure.input(z.object({
+    id: z.number(),
+    name: z.string().min(2).optional(),
+    slug: z.string().min(3).regex(/^[a-z0-9-]+$/).optional(),
+    logoUrl: z.string().optional(),
+    primaryColor: z.string().optional(),
+    secondaryColor: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email().optional(),
+    address: z.string().optional(),
+    cnpj: z.string().optional(),
+    plan: z.enum(["starter", "pro", "enterprise"]).optional(),
+    maxPatients: z.number().int().positive().optional(),
+    maxConsultants: z.number().int().positive().optional(),
+    isActive: z.boolean().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const { id, ...data } = input;
+    if (data.slug) {
+      const existing = await db.getClinicBySlug(data.slug);
+      if (existing && existing.id !== id) throw new TRPCError({ code: "CONFLICT", message: "Slug já em uso" });
+    }
+    await db.updateClinic(id, data);
+    await db.logAudit({ userId: ctx.user.id, action: "update", entity: "clinic", entityId: id });
+  }),
+});
+
+// ─── MAIN ROUTER ───────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -756,6 +810,7 @@ export const appRouter = router({
   polypharmacy: polypharmacyRouter,
   teamQueue: teamQueueRouter,
   protocolDocument: protocolDocumentRouter,
+  clinic: clinicRouter,
 });
 
 export type AppRouter = typeof appRouter;

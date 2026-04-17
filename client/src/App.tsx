@@ -33,6 +33,7 @@ const SistemasClinico = lazy(() => import("./pages/SistemasClinico"));
 const FilaEquipe = lazy(() => import("./pages/FilaEquipe"));
 const Polifarmacia = lazy(() => import("./pages/Polifarmacia"));
 const Protocolos = lazy(() => import("./pages/Protocolos"));
+const Clinicas = lazy(() => import("./pages/Clinicas"));
 
 function PageLoader() {
   return (
@@ -70,6 +71,7 @@ function DashboardRouter() {
           <Route path="/fila-equipe" component={FilaEquipe} />
           <Route path="/polifarmacia" component={Polifarmacia} />
           <Route path="/protocolos" component={Protocolos} />
+          <Route path="/clinicas" component={Clinicas} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
@@ -84,6 +86,9 @@ function Router() {
         {/* Patient portal - public, no auth required */}
         <Route path="/portal/:token" component={PatientPortal} />
         <Route path="/portal/:token/:tab" component={PatientPortal} />
+        {/* Slug-aware portal for multi-clinic branding */}
+        <Route path="/c/:slug/:token" component={PatientPortal} />
+        <Route path="/c/:slug/:token/:tab" component={PatientPortal} />
         {/* All other routes go through dashboard layout */}
         <Route component={DashboardRouter} />
       </Switch>

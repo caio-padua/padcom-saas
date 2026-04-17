@@ -25,7 +25,8 @@ import {
   LayoutDashboard, Users, ClipboardList, Stethoscope, Sparkles,
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
   UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
-  Cog, Filter, Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle
+  Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle,
+  Building2, Cog, Filter
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -54,6 +55,7 @@ const menuItems = [
   { icon: ListTodo, label: "Fila da Equipe", path: "/fila-equipe" },
   { icon: AlertTriangle, label: "Polifarmácia", path: "/polifarmacia" },
   { icon: FileText, label: "Protocolos", path: "/protocolos" },
+  { icon: Building2, label: "Clínicas", path: "/clinicas" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 

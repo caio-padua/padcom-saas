@@ -6,7 +6,7 @@ import {
   dailyReports, prescriptionReports, alerts, alertRules, followUpSessions,
   exams, auditLog, scoringWeights, scoringBands, motorActions, clinicalFlags,
   funnelStatus, medications, flowConfig, clinicalSystems, sleepDetails,
-  physicalActivityDetails, polypharmacyRules, teamQueue, protocolDocuments
+  physicalActivityDetails, polypharmacyRules, teamQueue, protocolDocuments, clinics
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -46,9 +46,12 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // ─── PATIENT HELPERS ───────────────────────────────────────────
-export async function listPatients(createdById?: number) {
+export async function listPatients(createdById?: number, clinicId?: number) {
   const db = await getDb(); if (!db) return [];
-  if (createdById) return db.select().from(patients).where(eq(patients.createdById, createdById)).orderBy(desc(patients.createdAt));
+  const conditions = [];
+  if (createdById) conditions.push(eq(patients.createdById, createdById));
+  if (clinicId) conditions.push(eq(patients.clinicId, clinicId));
+  if (conditions.length > 0) return db.select().from(patients).where(and(...conditions)).orderBy(desc(patients.createdAt));
   return db.select().from(patients).orderBy(desc(patients.createdAt));
 }
 
@@ -76,8 +79,9 @@ export async function updatePatient(id: number, data: any) {
 }
 
 // ─── CONSULTANT HELPERS ────────────────────────────────────────
-export async function listConsultants() {
+export async function listConsultants(clinicId?: number) {
   const db = await getDb(); if (!db) return [];
+  if (clinicId) return db.select().from(consultants).where(eq(consultants.clinicId, clinicId)).orderBy(desc(consultants.createdAt));
   return db.select().from(consultants).orderBy(desc(consultants.createdAt));
 }
 
@@ -536,4 +540,33 @@ export async function createProtocolDocument(data: any) {
 export async function updateProtocolDocument(id: number, data: any) {
   const db = await getDb(); if (!db) return;
   await db.update(protocolDocuments).set(data).where(eq(protocolDocuments.id, id));
+}
+
+// ─── CLINICS (multi-tenancy) ────────────────────────────────
+export async function createClinic(data: { slug: string; name: string; ownerUserId: number; logoUrl?: string; primaryColor?: string; secondaryColor?: string; phone?: string; email?: string; address?: string; cnpj?: string; plan?: "starter" | "pro" | "enterprise"; maxPatients?: number; maxConsultants?: number }) {
+  const db = await getDb(); if (!db) return;
+  const [result] = await db.insert(clinics).values(data).$returningId();
+  return result;
+}
+
+export async function listClinics() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(clinics).orderBy(clinics.name);
+}
+
+export async function getClinicBySlug(slug: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const rows = await db.select().from(clinics).where(eq(clinics.slug, slug)).limit(1);
+  return rows[0];
+}
+
+export async function getClinicById(id: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const rows = await db.select().from(clinics).where(eq(clinics.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function updateClinic(id: number, data: Partial<{ name: string; slug: string; logoUrl: string; primaryColor: string; secondaryColor: string; phone: string; email: string; address: string; cnpj: string; plan: "starter" | "pro" | "enterprise"; maxPatients: number; maxConsultants: number; isActive: boolean }>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(clinics).set(data).where(eq(clinics.id, id));
 }

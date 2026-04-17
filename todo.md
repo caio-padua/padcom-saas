@@ -152,7 +152,7 @@
 - [x] Página Protocolos com criação de documentos (protocolo/anamnese/relatório)
 - [x] Assinatura do médico responsável (nome + CRM)
 - [x] Envio do protocolo por WhatsApp ou e-mail com marcação de envio
-- [ ] Geração de PDF renderizado do protocolo final
+- [x] Geração de PDF renderizado do protocolo final (jsPDF com header PADCOM, dados do paciente, score, flags, assinatura)
 
 ## PASSO 9 — Funil Comercial e Captação
 - [x] Chips de funil no dashboard com contagem (polling 30s)
@@ -161,7 +161,9 @@
 - [x] Previsão comercial determinística com backend (funnel.commercialForecast) + UI com receita estimada
 
 ## PASSO 10 — Multi-clínica e Escalabilidade
-- [ ] Tenancy por slug com branding configurável
+- [x] Tabela clinics com CRUD, color picker, planos Starter/Pro/Enterprise, URL por slug
+- [x] Scoping real multi-tenant: clinicId adicionado a patients e consultants no schema + migração V5 aplicada + helpers listPatients/listConsultants filtram por clinicId
+- [x] Portal slug-aware: rotas /c/:slug/:token e /c/:slug/:token/:tab com branding dinâmico da clínica (nome, cor primária, logo via clinic.getBySlug, fallback com inicial do nome)
 - [x] Vídeo explicativo por pergunta (campo videoUrl no schema + UI no CRUD de perguntas com expandível)
 - [x] Flag informativa V16 para valores altos em escalas (>80% do máximo)
 - [x] Recalibragem real V16: score por bloco clínico (CARDIO, META, ENDO, DIGEST, NEURO, SONO, ATIV), ponderação por step (1.3/1.5/1.2/0.8/0.5), cálculo de complexidade (baixa/media/alta/muito_alta)
@@ -183,3 +185,11 @@
 - [x] Página FilaEquipe (gestão de atendimentos por perfil profissional)
 - [x] Página Polifarmácia (regras de interação e verificação por paciente)
 - [x] Página Protocolos (criação, assinatura e envio)
+
+## Evolução Futura (Backlog)
+- [ ] Expandir multi-tenancy: adicionar clinicId a anamnesis_questions, prescriptions, daily_reports, alerts e filtrar nos helpers/routers
+- [ ] Integração com Trello para cards de alertas
+- [ ] Notificações push para médico e consultoras
+- [ ] Integração com calendário (agendamento de consultas)
+- [ ] Exportação de dados em CSV/Excel
+- [ ] Modo offline para relatos do paciente (PWA)

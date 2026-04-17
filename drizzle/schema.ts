@@ -27,6 +27,7 @@ export const patients = mysqlTable("patients", {
   accessToken: varchar("accessToken", { length: 64 }).notNull().unique(),
   notes: text("notes"),
   isActive: boolean("isActive").default(true).notNull(),
+  clinicId: int("clinicId"),
   createdById: int("createdById").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -45,6 +46,7 @@ export const consultants = mysqlTable("consultants", {
   canAccessIntegrative: boolean("canAccessIntegrative").default(true).notNull(),
   canAccessAesthetic: boolean("canAccessAesthetic").default(false).notNull(),
   canAccessReports: boolean("canAccessReports").default(true).notNull(),
+  clinicId: int("clinicId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -444,3 +446,26 @@ export const protocolDocuments = mysqlTable("protocol_documents", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type ProtocolDocument = typeof protocolDocuments.$inferSelect;
+
+// ─── CLINICS (multi-tenancy) ────────────────────────────────
+export const clinics = mysqlTable("clinics", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  logoUrl: text("logoUrl"),
+  primaryColor: varchar("primaryColor", { length: 20 }).default("#10553C"),
+  secondaryColor: varchar("secondaryColor", { length: 20 }).default("#D4AF37"),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  address: text("address"),
+  cnpj: varchar("cnpj", { length: 20 }),
+  ownerUserId: int("ownerUserId").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  plan: mysqlEnum("plan", ["starter", "pro", "enterprise"]).default("starter").notNull(),
+  maxPatients: int("maxPatients").default(50),
+  maxConsultants: int("maxConsultants").default(3),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Clinic = typeof clinics.$inferSelect;
+export type InsertClinic = typeof clinics.$inferInsert;

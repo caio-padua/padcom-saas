@@ -1,13 +1,127 @@
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { FileText, Send, Plus, Loader2, MessageSquare, Mail, CheckCircle, AlertTriangle, ShieldAlert, Eye } from "lucide-react";
+import { FileText, Send, Plus, Loader2, MessageSquare, Mail, CheckCircle, AlertTriangle, ShieldAlert, Eye, Download } from "lucide-react";
+
+function generatePDF(doc: any, patient: any, flags: any[]) {
+  import("jspdf").then(({ jsPDF }) => {
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Header bar
+    pdf.setFillColor(16, 85, 60);
+    pdf.rect(0, 0, pageW, 28, "F");
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("PADCOM GLOBAL", 14, 14);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("Sistema Clinico Integrado de Medicina Integrativa", 14, 22);
+    pdf.setTextColor(0, 0, 0);
+    y = 38;
+
+    // Document title
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(doc.title || "Protocolo Clinico", 14, y);
+    y += 6;
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Tipo: ${(doc.documentType || "protocolo").toUpperCase()} | Gerado em: ${new Date().toLocaleDateString("pt-BR")} as ${new Date().toLocaleTimeString("pt-BR")}`, 14, y);
+    y += 10;
+
+    // Patient info
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFillColor(245, 245, 245);
+    pdf.roundedRect(14, y, pageW - 28, 30, 2, 2, "F");
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("DADOS DO PACIENTE", 18, y + 7);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.text(`Nome: ${patient?.name || "N/A"}`, 18, y + 14);
+    pdf.text(`CPF: ${patient?.cpf || "N/A"} | Telefone: ${patient?.phone || "N/A"}`, 18, y + 20);
+    pdf.text(`Email: ${patient?.email || "N/A"} | Nascimento: ${patient?.birthDate ? new Date(patient.birthDate).toLocaleDateString("pt-BR") : "N/A"}`, 18, y + 26);
+    y += 38;
+
+    // Score section
+    if (doc.score != null || doc.scoreBand) {
+      pdf.setFillColor(240, 248, 240);
+      pdf.roundedRect(14, y, pageW - 28, 18, 2, 2, "F");
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("SCORE CLINICO", 18, y + 7);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      const scoreText = `Score: ${doc.score ?? "N/A"}/100 | Faixa: ${doc.scoreBand || "N/A"}`;
+      pdf.text(scoreText, 18, y + 14);
+      y += 24;
+    }
+
+    // Clinical flags
+    if (flags && flags.length > 0) {
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("FLAGS CLINICAS", 14, y);
+      y += 6;
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      for (const f of flags) {
+        const status = f.status === "pendente" ? "[PENDENTE]" : "[VALIDADO]";
+        pdf.text(`${status} ${f.flagType}: ${f.description || ""}`, 18, y);
+        y += 5;
+        if (y > 270) { pdf.addPage(); y = 20; }
+      }
+      y += 6;
+    }
+
+    // Content placeholder
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("OBSERVACOES E CONDUTA", 14, y);
+    y += 6;
+    pdf.setDrawColor(200, 200, 200);
+    for (let i = 0; i < 8; i++) {
+      pdf.line(14, y, pageW - 14, y);
+      y += 7;
+    }
+    y += 6;
+
+    // Signature
+    if (doc.signedByName) {
+      if (y > 240) { pdf.addPage(); y = 20; }
+      pdf.setDrawColor(0, 0, 0);
+      pdf.line(pageW / 2 - 40, y + 10, pageW / 2 + 40, y + 10);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(doc.signedByName, pageW / 2, y + 16, { align: "center" });
+      if (doc.signedByCRM) {
+        pdf.text(`CRM: ${doc.signedByCRM}`, pageW / 2, y + 21, { align: "center" });
+      }
+      if (doc.signedAt) {
+        pdf.text(`Assinado em: ${new Date(doc.signedAt).toLocaleDateString("pt-BR")}`, pageW / 2, y + 26, { align: "center" });
+      }
+    }
+
+    // Footer
+    const pageH = pdf.internal.pageSize.getHeight();
+    pdf.setFontSize(7);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text("PADCOM GLOBAL — Documento gerado automaticamente pelo sistema. Validade condicionada a assinatura do profissional responsavel.", pageW / 2, pageH - 8, { align: "center" });
+
+    pdf.save(`${(doc.title || "protocolo").replace(/\s+/g, "_")}_${patient?.name?.replace(/\s+/g, "_") || "paciente"}.pdf`);
+    toast.success("PDF gerado com sucesso");
+  });
+}
 
 export default function Protocolos() {
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
@@ -30,12 +144,16 @@ export default function Protocolos() {
   const pendingFlags = (flags.data ?? []).filter((f: any) => f.status === "pendente");
   const hasBlockingFlags = pendingFlags.length > 0;
 
+  const handleDownloadPDF = useCallback((doc: any) => {
+    generatePDF(doc, selectedPatient, flags.data ?? []);
+  }, [selectedPatient, flags.data]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Protocolos e Documentos</h1>
-          <p className="text-muted-foreground text-sm mt-1">Gestão de protocolos clínicos, relatórios e envio ao paciente</p>
+          <p className="text-muted-foreground text-sm mt-1">Gestao de protocolos clinicos, relatorios e envio ao paciente</p>
         </div>
       </div>
 
@@ -50,9 +168,8 @@ export default function Protocolos() {
         </Select>
         {selectedPatientId && (
           <div className="flex items-center gap-2">
-            {/* Preview button - always available */}
             <Button variant="outline" onClick={() => setPreviewOpen(true)}>
-              <Eye className="h-4 w-4 mr-1" /> Preview Clínico
+              <Eye className="h-4 w-4 mr-1" /> Preview Clinico
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -64,13 +181,13 @@ export default function Protocolos() {
               <DialogContent>
                 <DialogHeader><DialogTitle>Criar Protocolo</DialogTitle></DialogHeader>
                 <div className="space-y-3">
-                  <Input placeholder="Título do documento" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                  <Input placeholder="Titulo do documento" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
                   <Select value={form.documentType} onValueChange={v => setForm(f => ({ ...f, documentType: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="protocolo">Protocolo</SelectItem>
                       <SelectItem value="anamnese">Anamnese</SelectItem>
-                      <SelectItem value="relatorio">Relatório</SelectItem>
+                      <SelectItem value="relatorio">Relatorio</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="grid grid-cols-2 gap-3">
@@ -108,10 +225,10 @@ export default function Protocolos() {
               <ShieldAlert className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium text-amber-800 dark:text-amber-200">
-                  Protocolo bloqueado — {pendingFlags.length} flag(s) clínica(s) pendente(s)
+                  Protocolo bloqueado — {pendingFlags.length} flag(s) clinica(s) pendente(s)
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                  É necessário validar todas as flags clínicas antes de criar um novo protocolo. Acesse a página de Flags Clínicas para resolver.
+                  E necessario validar todas as flags clinicas antes de criar um novo protocolo. Acesse a pagina de Flags Clinicas para resolver.
                 </p>
                 <div className="mt-2 space-y-1">
                   {pendingFlags.map((f: any) => (
@@ -128,15 +245,14 @@ export default function Protocolos() {
         </Card>
       )}
 
-      {/* Preview Clínico Dialog */}
+      {/* Preview Clinico Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Preview Clínico — {selectedPatient?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Preview Clinico — {selectedPatient?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {/* Flags Section */}
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                <ShieldAlert className="h-4 w-4" /> Flags Clínicas
+                <ShieldAlert className="h-4 w-4" /> Flags Clinicas
               </h4>
               {(flags.data ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma flag registrada</p>
@@ -145,11 +261,7 @@ export default function Protocolos() {
                   {(flags.data ?? []).map((f: any) => (
                     <div key={f.id} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
                       <div className="flex items-center gap-2">
-                        {f.status === "pendente" ? (
-                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                        ) : (
-                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                        )}
+                        {f.status === "pendente" ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> : <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
                         <span>{f.flagType}: {f.description}</span>
                       </div>
                       <Badge variant={f.status === "pendente" ? "destructive" : "secondary"} className="text-[10px]">{f.status}</Badge>
@@ -158,8 +270,6 @@ export default function Protocolos() {
                 </div>
               )}
             </div>
-
-            {/* Existing Protocols */}
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                 <FileText className="h-4 w-4" /> Protocolos Existentes
@@ -180,8 +290,6 @@ export default function Protocolos() {
                 </div>
               )}
             </div>
-
-            {/* Summary */}
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
               <p className="text-sm font-medium">Resumo</p>
               <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
@@ -192,7 +300,7 @@ export default function Protocolos() {
               </div>
               {hasBlockingFlags && (
                 <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Criação de protocolo bloqueada até validação das flags
+                  <AlertTriangle className="h-3 w-3" /> Criacao de protocolo bloqueada ate validacao das flags
                 </p>
               )}
             </div>
@@ -236,10 +344,14 @@ export default function Protocolos() {
                     <p className="text-[10px] text-muted-foreground">{new Date(doc.createdAt).toLocaleString("pt-BR")}</p>
                   </div>
                   <div className="flex gap-1">
+                    {/* PDF Download Button */}
+                    <Button size="sm" variant="outline" onClick={() => handleDownloadPDF(doc)}>
+                      <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                    </Button>
                     {(!doc.sentVia || doc.sentVia === "nenhum") && selectedPatient?.phone && (
                       <Button size="sm" variant="outline" onClick={() => {
                         const phone = selectedPatient.phone?.replace(/\D/g, "");
-                        const msg = encodeURIComponent(`Olá ${selectedPatient.name}, segue seu protocolo: ${doc.title}. Acesse o portal para mais detalhes.`);
+                        const msg = encodeURIComponent(`Ola ${selectedPatient.name}, segue seu protocolo: ${doc.title}. Acesse o portal para mais detalhes.`);
                         window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
                         sendMut.mutate({ id: doc.id, sentVia: "whatsapp" });
                       }}>

@@ -23,10 +23,24 @@ const STEP_LABELS: Record<number, { title: string; subtitle: string; icon: any }
 };
 
 export default function PatientPortal() {
-  const params = useParams<{ token: string; tab?: string }>();
+  const params = useParams<{ token: string; tab?: string; slug?: string }>();
   const token = params.token;
+  const slug = params.slug;
   const { data: patient, isLoading } = trpc.patient.getByToken.useQuery({ token }, { enabled: !!token });
+  const { data: clinic } = trpc.clinic.getBySlug.useQuery({ slug: slug! }, { enabled: !!slug });
   const [activeTab, setActiveTab] = useState(params.tab || "relato");
+
+  // Apply clinic branding dynamically
+  useEffect(() => {
+    if (clinic?.primaryColor) {
+      document.documentElement.style.setProperty('--clinic-primary', clinic.primaryColor);
+      document.documentElement.style.setProperty('--clinic-secondary', clinic.secondaryColor || '#D4AF37');
+    }
+    return () => {
+      document.documentElement.style.removeProperty('--clinic-primary');
+      document.documentElement.style.removeProperty('--clinic-secondary');
+    };
+  }, [clinic]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/10 flex items-center justify-center">
@@ -48,11 +62,15 @@ export default function PatientPortal() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/10">
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Stethoscope className="h-5 w-5 text-primary" />
-          </div>
+          {clinic?.logoUrl ? (
+            <img src={clinic.logoUrl} alt={clinic.name || 'Clínica'} className="h-9 w-9 rounded-xl object-cover" />
+          ) : (
+            <div className="h-9 w-9 rounded-xl flex items-center justify-center text-white font-bold" style={{ backgroundColor: clinic?.primaryColor || 'oklch(0.37 0.08 165)' }}>
+              {clinic?.name?.charAt(0) || <Stethoscope className="h-5 w-5" />}
+            </div>
+          )}
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-primary">PADCOM</h1>
+            <h1 className="text-sm font-bold tracking-tight" style={{ color: clinic?.primaryColor || undefined }}>{clinic?.name || 'PADCOM'}</h1>
             <p className="text-[11px] text-muted-foreground">Olá, {patient.name?.split(" ")[0]}</p>
           </div>
         </div>
