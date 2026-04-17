@@ -178,7 +178,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 138 testes passando (7 arquivos de teste)
+- [x] 156 testes passando (9 arquivos de teste, incluindo testes de anastomose)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
@@ -204,3 +204,14 @@
 - [x] scoring-engine: calculateScoreFromSession resolve clinicId do paciente via sessão e filtra questions por clínica (com fallback global)
 - [x] Auto-alerts criados em prescriptionReport/exam: propagam clinicId do paciente via db.getPatient
 - [ ] Testes de isolamento real entre clínicas (fixtures com dados de múltiplas clínicas) — requer DB de teste dedicado
+
+## V8 — Análise de Anastomose com Núcleo (Integrative Health Engine)
+- [x] Acesso validado ao código matriz via GitHub (253 MB, 3836 objetos, 144 tabelas PostgreSQL)
+- [x] Estudo completo da arquitetura: monorepo pnpm, Express 5, Drizzle ORM, React/Vite/Wouter
+- [x] Mapeamento de 21 aliases de tabelas PADCOM SAAS → Núcleo PT-BR
+- [x] Mapeamento de 12 aliases de campos críticos (clinicId→unidade_id, role→perfil, etc.)
+- [x] Identificação de 7 contribuições únicas do SAAS (scoring engine, bands, clinical flags, etc.)
+- [x] Documentação de 7 riscos de quebra no transplante (MySQL→PG, tRPC→REST, role→perfil, etc.)
+- [x] Plano de transplante em 4 fases (Preparação, Adaptadores, Enxerto, Validação)
+- [x] 18 testes semânticos de anastomose passando (nomenclatura, aliases, compatibilidade, riscos)
+- [x] Documento completo em docs/ANASTOMOSE-NUCLEO.md
