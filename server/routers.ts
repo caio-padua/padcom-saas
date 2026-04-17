@@ -180,7 +180,7 @@ const prescriptionRouter = router({
   listByToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
     const patient = await db.getPatientByToken(input.token);
     if (!patient) throw new TRPCError({ code: "NOT_FOUND" });
-    return db.listPrescriptions(patient.id);
+    return db.listPrescriptions(patient.id, patient.clinicId ?? undefined);
   }),
   create: protectedProcedure.input(z.object({
     patientId: z.number(), code: z.string(), name: z.string(), via: z.string().optional(),
@@ -249,13 +249,15 @@ const prescriptionReportRouter = router({
     if (!pId) throw new TRPCError({ code: "BAD_REQUEST" });
     const { token, ...data } = input;
     const id = await db.createPrescriptionReport({ ...data, patientId: pId });
-    // Auto-create alert for adverse reactions
+    // Auto-create alert for adverse reactions (propagate clinicId from patient)
     if (input.reportType === "reacao_adversa") {
+      const patientData = pId ? await db.getPatient(pId) : null;
       await db.createAlert({
         patientId: pId, category: "Reacao a Formula",
         priority: input.severity === "grave" ? "critica" : input.severity === "moderada" ? "alta" : "moderada",
         title: "Reacao adversa reportada", description: input.description,
         source: "prescription_report", sourceId: id,
+        clinicId: patientData?.clinicId ?? undefined,
       });
     }
     return { id };
@@ -307,25 +309,27 @@ const examRouter = router({
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createExam(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "exam", entityId: id ?? undefined });
-    // Auto-alert engine
+    // Auto-alert engine (propagate clinicId from patient)
     if (input.value && input.referenceMax) {
       const val = parseFloat(input.value);
       const max = parseFloat(input.referenceMax);
       const min = input.referenceMin ? parseFloat(input.referenceMin) : 0;
+      const patientData = await db.getPatient(input.patientId);
+      const alertClinicId = patientData?.clinicId ?? undefined;
       if (!isNaN(val) && !isNaN(max) && val > max) {
         await db.createAlert({
           patientId: input.patientId, category: "Exame Alterado",
           priority: val > max * 1.5 ? "critica" : val > max * 1.2 ? "alta" : "moderada",
           title: `${input.examName} acima do limite (${input.value} ${input.unit ?? ""})`,
           description: `Valor: ${input.value}, Referencia: ${input.referenceMin ?? "0"}-${input.referenceMax}`,
-          source: "exam", sourceId: id,
+          source: "exam", sourceId: id, clinicId: alertClinicId,
         });
       } else if (!isNaN(val) && !isNaN(min) && val < min && min > 0) {
         await db.createAlert({
           patientId: input.patientId, category: "Exame Alterado", priority: "moderada",
           title: `${input.examName} abaixo do limite (${input.value} ${input.unit ?? ""})`,
           description: `Valor: ${input.value}, Referencia: ${input.referenceMin}-${input.referenceMax}`,
-          source: "exam", sourceId: id,
+          source: "exam", sourceId: id, clinicId: alertClinicId,
         });
       }
     }

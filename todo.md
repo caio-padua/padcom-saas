@@ -200,7 +200,7 @@
 - [x] 31 testes unitários verificando propagação de clinicId nos routers e auth gates (v6-multitenant.test.ts)
 
 ## Pendências de Scoping Multi-Tenant (Backlog Técnico)
-- [ ] Fluxos listByToken/patient portal: propagar clinicId do paciente automaticamente
-- [ ] scoring-engine: listQuestions global precisa de scoping por clínica quando aplicável
-- [ ] Auto-alerts criados em prescriptionReport/exam: propagar clinicId do paciente
-- [ ] Testes de isolamento real entre clínicas (fixtures com dados de múltiplas clínicas)
+- [x] Fluxos listByToken/patient portal: prescription.listByToken agora propaga patient.clinicId automaticamente
+- [x] scoring-engine: calculateScoreFromSession resolve clinicId do paciente via sessão e filtra questions por clínica (com fallback global)
+- [x] Auto-alerts criados em prescriptionReport/exam: propagam clinicId do paciente via db.getPatient
+- [ ] Testes de isolamento real entre clínicas (fixtures com dados de múltiplas clínicas) — requer DB de teste dedicado

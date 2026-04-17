@@ -315,14 +315,41 @@ function detectClinicalFlags(
   return flags;
 }
 
-// ─── SCORE CALCULATION FROM SESSION ───────────────────────────
-export async function calculateScoreFromSession(sessionId: number): Promise<ScoreResult | null> {
+// ─// ─── SCORE CALCULATION FROM SESSION ───────────────────────
+export async function calculateScoreFromSession(sessionId: number, clinicId?: number): Promise<ScoreResult | null> {
   const responses = await db.getResponses(sessionId);
   if (!responses || responses.length === 0) return null;
 
-  const questions = await db.listQuestions();
-  if (!questions || questions.length === 0) return null;
+  // If clinicId not provided, try to resolve from session's patient
+  let resolvedClinicId = clinicId;
+  if (!resolvedClinicId) {
+    const database = await db.getDb();
+    if (database) {
+      const { anamnesisSessions } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const [session] = await database.select().from(anamnesisSessions).where(eq(anamnesisSessions.id, sessionId)).limit(1);
+      if (session?.patientId) {
+        const patient = await db.getPatient(session.patientId);
+        resolvedClinicId = patient?.clinicId ?? undefined;
+      }
+    }
+  }
 
+  const questions = await db.listQuestions(undefined, resolvedClinicId);
+  if (!questions || questions.length === 0) {
+    // Fallback to global questions if clinic-scoped returns empty
+    const globalQuestions = await db.listQuestions();
+    if (!globalQuestions || globalQuestions.length === 0) return null;
+    return calculateScoreWithQuestions(responses, globalQuestions);
+  }
+
+  return calculateScoreWithQuestions(responses, questions);
+}
+
+async function calculateScoreWithQuestions(
+  responses: Awaited<ReturnType<typeof db.getResponses>>,
+  questions: Awaited<ReturnType<typeof db.listQuestions>>
+): Promise<ScoreResult> {
   const mappedResponses = responses.map(r => ({
     questionId: r.questionId,
     code: (questions.find(q => q.id === r.questionId) as any)?.code ?? undefined,
