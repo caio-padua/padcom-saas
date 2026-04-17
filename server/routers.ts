@@ -6,6 +6,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
+import { calculateScore, calculateScoreFromSession } from "./scoring-engine";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao administrador" });
@@ -43,16 +44,17 @@ const patientRouter = router({
 const consultantRouter = router({
   list: protectedProcedure.query(async () => db.listConsultants()),
   create: adminProcedure.input(z.object({
-    name: z.string().min(1), role: z.enum(["enfermeira", "biomedica", "nutricionista", "esteticista", "outro"]), email: z.string().optional(),
-    phone: z.string().optional(), canAccessIntegrative: z.boolean().optional(),
-    canAccessAesthetic: z.boolean().optional(), canAccessReports: z.boolean().optional(),
+    name: z.string().min(1), role: z.enum(["enfermeira", "biomedica", "nutricionista", "esteticista", "outro"]),
+    email: z.string().optional(), phone: z.string().optional(),
+    canAccessIntegrative: z.boolean().optional(), canAccessAesthetic: z.boolean().optional(), canAccessReports: z.boolean().optional(),
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createConsultant(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "consultant", entityId: id ?? undefined });
     return { id };
   }),
   update: adminProcedure.input(z.object({
-    id: z.number(), name: z.string().optional(), role: z.string().optional(),
+    id: z.number(), name: z.string().optional(),
+    role: z.enum(["enfermeira", "biomedica", "nutricionista", "esteticista", "outro"]).optional(),
     email: z.string().optional(), phone: z.string().optional(),
     isActive: z.boolean().optional(), canAccessIntegrative: z.boolean().optional(),
     canAccessAesthetic: z.boolean().optional(), canAccessReports: z.boolean().optional(),
@@ -69,12 +71,20 @@ const consultantRouter = router({
 
 // ─── ANAMNESIS QUESTION ROUTER ─────────────────────────────────
 const questionRouter = router({
-  list: protectedProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]).optional() }).optional()).query(async ({ input }) => db.listQuestions(input?.category as any)),
+  list: protectedProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]).optional() }).optional())
+    .query(async ({ input }) => db.listQuestions(input?.category as any)),
+  listPublic: publicProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]) }))
+    .query(async ({ input }) => db.listQuestions(input.category as any)),
   create: adminProcedure.input(z.object({
     category: z.enum(["integrativa", "estetica", "relato_diario"]), section: z.string().min(1),
-    questionText: z.string().min(1), fieldType: z.enum(["text", "number", "scale", "select", "multiselect", "checkbox", "date", "textarea"]),
+    questionText: z.string().min(1),
+    fieldType: z.enum(["text", "number", "scale", "select", "multiselect", "checkbox", "date", "textarea"]),
     options: z.any().optional(), scaleMin: z.number().optional(), scaleMax: z.number().optional(),
     isRequired: z.boolean().optional(), sortOrder: z.number().optional(),
+    code: z.string().optional(), block: z.string().optional(), step: z.number().optional(),
+    clinicalGoal: z.string().optional(), commercialGoal: z.string().optional(),
+    helper: z.string().optional(), technicalName: z.string().optional(),
+    weight: z.string().optional(), videoUrl: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createQuestion(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "question", entityId: id ?? undefined });
@@ -85,6 +95,10 @@ const questionRouter = router({
     fieldType: z.enum(["text", "number", "scale", "select", "multiselect", "checkbox", "date", "textarea"]).optional(),
     options: z.any().optional(), scaleMin: z.number().optional(), scaleMax: z.number().optional(),
     isRequired: z.boolean().optional(), sortOrder: z.number().optional(), isActive: z.boolean().optional(),
+    code: z.string().optional(), block: z.string().optional(), step: z.number().optional(),
+    clinicalGoal: z.string().optional(), commercialGoal: z.string().optional(),
+    helper: z.string().optional(), technicalName: z.string().optional(),
+    weight: z.string().optional(), videoUrl: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
     const { id, ...data } = input;
     await db.updateQuestion(id, data);
@@ -98,7 +112,8 @@ const questionRouter = router({
 
 // ─── ANAMNESIS SESSION ROUTER ──────────────────────────────────
 const anamnesisRouter = router({
-  listSessions: protectedProcedure.input(z.object({ patientId: z.number(), category: z.enum(["integrativa", "estetica"]).optional() })).query(async ({ input }) => db.listSessions(input.patientId, input.category)),
+  listSessions: protectedProcedure.input(z.object({ patientId: z.number(), category: z.enum(["integrativa", "estetica"]).optional() }))
+    .query(async ({ input }) => db.listSessions(input.patientId, input.category)),
   createSession: protectedProcedure.input(z.object({
     patientId: z.number(), category: z.enum(["integrativa", "estetica"]),
     conductedByType: z.enum(["medico", "consultora", "paciente"]).optional(),
@@ -115,13 +130,16 @@ const anamnesisRouter = router({
   }),
   completeSession: protectedProcedure.input(z.object({ sessionId: z.number(), notes: z.string().optional() })).mutation(async ({ input }) => {
     await db.updateSession(input.sessionId, { status: "concluida", completedAt: new Date(), notes: input.notes });
+    // Calculate score after completing session
+    const scoreResult = await calculateScoreFromSession(input.sessionId);
+    return { scoreResult };
   }),
-  // Public endpoint for patient self-service
+  // Public endpoints for patient self-service
   createPatientSession: publicProcedure.input(z.object({
     token: z.string(), category: z.enum(["integrativa", "estetica"]),
   })).mutation(async ({ input }) => {
     const patient = await db.getPatientByToken(input.token);
-    if (!patient) throw new TRPCError({ code: "NOT_FOUND", message: "Paciente não encontrado" });
+    if (!patient) throw new TRPCError({ code: "NOT_FOUND", message: "Paciente nao encontrado" });
     const id = await db.createSession({ patientId: patient.id, category: input.category, conductedByType: "paciente", status: "em_andamento" });
     return { id, patientId: patient.id };
   }),
@@ -130,9 +148,26 @@ const anamnesisRouter = router({
     responses: z.array(z.object({ questionId: z.number(), answerText: z.string().optional(), answerNumber: z.string().optional(), answerJson: z.any().optional() })),
   })).mutation(async ({ input }) => {
     const patient = await db.getPatientByToken(input.token);
-    if (!patient) throw new TRPCError({ code: "NOT_FOUND", message: "Paciente não encontrado" });
+    if (!patient) throw new TRPCError({ code: "NOT_FOUND", message: "Paciente nao encontrado" });
     await db.saveResponses(input.sessionId, input.responses);
     await db.updateSession(input.sessionId, { status: "concluida", completedAt: new Date() });
+    // Calculate score and update funnel
+    const scoreResult = await calculateScoreFromSession(input.sessionId);
+    if (scoreResult) {
+      await db.upsertFunnelStatus(patient.id, {
+        stage: "concluiu_clinico",
+        score: scoreResult.normalizedScore,
+        scoreBand: scoreResult.band?.name ?? null,
+      });
+      // Create clinical flags
+      for (const flag of scoreResult.flags) {
+        await db.createClinicalFlag({
+          patientId: patient.id, flagType: flag.type, code: flag.code,
+          description: flag.description, source: "anamnese", sourceId: input.sessionId,
+        });
+      }
+    }
+    return { scoreResult };
   }),
 });
 
@@ -212,9 +247,9 @@ const prescriptionReportRouter = router({
     // Auto-create alert for adverse reactions
     if (input.reportType === "reacao_adversa") {
       await db.createAlert({
-        patientId: pId, category: "Reação a Fórmula",
+        patientId: pId, category: "Reacao a Formula",
         priority: input.severity === "grave" ? "critica" : input.severity === "moderada" ? "alta" : "moderada",
-        title: `Reação adversa reportada`, description: input.description,
+        title: "Reacao adversa reportada", description: input.description,
         source: "prescription_report", sourceId: id,
       });
     }
@@ -267,7 +302,7 @@ const examRouter = router({
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createExam(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "exam", entityId: id ?? undefined });
-    // Auto-alert engine: check exam against reference ranges
+    // Auto-alert engine
     if (input.value && input.referenceMax) {
       const val = parseFloat(input.value);
       const max = parseFloat(input.referenceMax);
@@ -277,15 +312,14 @@ const examRouter = router({
           patientId: input.patientId, category: "Exame Alterado",
           priority: val > max * 1.5 ? "critica" : val > max * 1.2 ? "alta" : "moderada",
           title: `${input.examName} acima do limite (${input.value} ${input.unit ?? ""})`,
-          description: `Valor: ${input.value}, Referência: ${input.referenceMin ?? "0"}-${input.referenceMax}`,
+          description: `Valor: ${input.value}, Referencia: ${input.referenceMin ?? "0"}-${input.referenceMax}`,
           source: "exam", sourceId: id,
         });
       } else if (!isNaN(val) && !isNaN(min) && val < min && min > 0) {
         await db.createAlert({
-          patientId: input.patientId, category: "Exame Alterado",
-          priority: "moderada",
+          patientId: input.patientId, category: "Exame Alterado", priority: "moderada",
           title: `${input.examName} abaixo do limite (${input.value} ${input.unit ?? ""})`,
-          description: `Valor: ${input.value}, Referência: ${input.referenceMin}-${input.referenceMax}`,
+          description: `Valor: ${input.value}, Referencia: ${input.referenceMin}-${input.referenceMax}`,
           source: "exam", sourceId: id,
         });
       }
@@ -294,7 +328,7 @@ const examRouter = router({
   }),
   update: protectedProcedure.input(z.object({
     id: z.number(), value: z.string().optional(), classification: z.string().optional(), notes: z.string().optional(),
-  })).mutation(async ({ input, ctx }) => {
+  })).mutation(async ({ input }) => {
     const { id, ...data } = input;
     await db.updateExam(id, data);
   }),
@@ -320,6 +354,124 @@ const followUpRouter = router({
   }),
 });
 
+// ─── SCORING ROUTER ────────────────────────────────────────────
+const scoringRouter = router({
+  bands: publicProcedure.query(async () => db.listScoringBands()),
+  weights: protectedProcedure.query(async () => db.listScoringWeights()),
+  motorActions: protectedProcedure.input(z.object({ triggerCode: z.string().optional() }).optional())
+    .query(async ({ input }) => db.listMotorActions(input?.triggerCode)),
+  calculateFromSession: protectedProcedure.input(z.object({ sessionId: z.number() }))
+    .query(async ({ input }) => calculateScoreFromSession(input.sessionId)),
+  calculate: publicProcedure.input(z.object({
+    responses: z.array(z.object({
+      questionId: z.number(), code: z.string().optional(),
+      answerText: z.string().optional(), answerNumber: z.string().optional(), answerJson: z.any().optional(),
+    })),
+  })).mutation(async ({ input }) => {
+    const questions = await db.listQuestions();
+    return calculateScore(input.responses, questions as any);
+  }),
+  createMotorAction: adminProcedure.input(z.object({
+    triggerCode: z.string(), triggerCondition: z.string(),
+    actionType: z.enum(["formula", "exame", "encaminhamento", "alerta", "painel"]),
+    actionValue: z.string(), priority: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const id = await db.createMotorAction(input);
+    return { id };
+  }),
+  updateMotorAction: adminProcedure.input(z.object({
+    id: z.number(), isActive: z.boolean().optional(), actionValue: z.string().optional(), priority: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const { id, ...data } = input;
+    await db.updateMotorAction(id, data);
+  }),
+});
+
+// ─── CLINICAL FLAGS ROUTER ─────────────────────────────────────
+const clinicalFlagRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listClinicalFlags(input.patientId)),
+  validate: protectedProcedure.input(z.object({
+    id: z.number(), status: z.enum(["aprovado", "rejeitado"]), notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    await db.updateClinicalFlag(input.id, {
+      status: input.status, validatedById: ctx.user.id, validatedAt: new Date(), notes: input.notes,
+    });
+    await db.logAudit({ userId: ctx.user.id, action: `flag_${input.status}`, entity: "clinical_flag", entityId: input.id });
+  }),
+});
+
+// ─── MEDICATION ROUTER ─────────────────────────────────────────
+const medicationRouter = router({
+  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listMedications(input.patientId)),
+  listByToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
+    const patient = await db.getPatientByToken(input.token);
+    if (!patient) throw new TRPCError({ code: "NOT_FOUND" });
+    return db.listMedications(patient.id);
+  }),
+  create: protectedProcedure.input(z.object({
+    patientId: z.number(), name: z.string().min(1), dosageUnit: z.string().optional(),
+    dosageValue: z.string().optional(), associatedDisease: z.string().optional(),
+    morningQty: z.number().optional(), afternoonQty: z.number().optional(), nightQty: z.number().optional(),
+    notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const id = await db.createMedication(input);
+    await db.logAudit({ userId: ctx.user.id, action: "create", entity: "medication", entityId: id ?? undefined });
+    // Check polypharmacy
+    const allMeds = await db.listMedications(input.patientId);
+    if (allMeds.length >= 5) {
+      const config = await db.getFlowConfig("TRAVAR_POLIFARMACIA");
+      if (config?.configValue === "ON") {
+        await db.createClinicalFlag({
+          patientId: input.patientId, flagType: "warning", code: "POLIFARMACIA",
+          description: `Polifarmacia detectada: ${allMeds.length} medicamentos ativos`,
+          source: "medication", sourceId: id,
+        });
+      }
+    }
+    return { id };
+  }),
+  update: protectedProcedure.input(z.object({
+    id: z.number(), name: z.string().optional(), dosageUnit: z.string().optional(),
+    dosageValue: z.string().optional(), associatedDisease: z.string().optional(),
+    morningQty: z.number().optional(), afternoonQty: z.number().optional(), nightQty: z.number().optional(),
+    isActive: z.boolean().optional(), notes: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const { id, ...data } = input;
+    await db.updateMedication(id, data);
+    await db.logAudit({ userId: ctx.user.id, action: "update", entity: "medication", entityId: id });
+  }),
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+    await db.deleteMedication(input.id);
+    await db.logAudit({ userId: ctx.user.id, action: "delete", entity: "medication", entityId: input.id });
+  }),
+});
+
+// ─── FUNNEL ROUTER ─────────────────────────────────────────────
+const funnelRouter = router({
+  get: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.getFunnelStatus(input.patientId)),
+  stats: protectedProcedure.query(async () => db.listFunnelStats()),
+  update: protectedProcedure.input(z.object({
+    patientId: z.number(),
+    stage: z.enum(["iniciou_e_parou", "concluiu_clinico", "concluiu_financeiro", "alto_interesse", "convertido"]),
+    score: z.number().optional(), scoreBand: z.string().optional(),
+    stoppedAtStep: z.number().optional(), stoppedAtModule: z.string().optional(), notes: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const { patientId, ...data } = input;
+    await db.upsertFunnelStatus(patientId, data);
+  }),
+});
+
+// ─── FLOW CONFIG ROUTER ────────────────────────────────────────
+const flowConfigRouter = router({
+  list: protectedProcedure.query(async () => db.listFlowConfigs()),
+  update: adminProcedure.input(z.object({
+    key: z.string(), value: z.string(),
+  })).mutation(async ({ input, ctx }) => {
+    await db.updateFlowConfig(input.key, input.value);
+    await db.logAudit({ userId: ctx.user.id, action: "update_config", entity: "flow_config", details: input });
+  }),
+});
+
 // ─── DASHBOARD ROUTER ──────────────────────────────────────────
 const dashboardRouter = router({
   stats: protectedProcedure.query(async ({ ctx }) => db.getDashboardStats(ctx.user.id)),
@@ -329,6 +481,9 @@ const dashboardRouter = router({
     const reports = await db.listDailyReports(input.patientId, days);
     const exams = await db.listExams(input.patientId);
     const sessions = await db.listFollowUpSessions(input.patientId);
+    const flags = await db.listClinicalFlags(input.patientId);
+    const funnel = await db.getFunnelStatus(input.patientId);
+    const meds = await db.listMedications(input.patientId);
     // Build symptom evolution data
     const symptomData = (reports ?? []).map((r: any) => ({
       date: r.reportDate, period: r.period,
@@ -352,12 +507,12 @@ const dashboardRouter = router({
       const scores: Record<string, number> = {};
       axes.forEach(axis => {
         const vals = latestReports.map((r: any) => r[axis] ? parseFloat(r[axis]) : null).filter((v: any): v is number => v !== null);
-        scores[axis] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        scores[axis] = vals.length > 0 ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : 0;
       });
       const total = Object.values(scores).reduce((a, b) => a + b, 0);
       clinicalScore = { axes: scores, total: Math.round((total / (axes.length * 10)) * 100) };
     }
-    return { symptomData, examGroups, sessions, clinicalScore };
+    return { symptomData, examGroups, sessions, clinicalScore, flags, funnel, medications: meds };
   }),
 });
 
@@ -383,6 +538,11 @@ export const appRouter = router({
   exam: examRouter,
   followUp: followUpRouter,
   dashboard: dashboardRouter,
+  scoring: scoringRouter,
+  clinicalFlag: clinicalFlagRouter,
+  medication: medicationRouter,
+  funnel: funnelRouter,
+  flowConfig: flowConfigRouter,
 });
 
 export type AppRouter = typeof appRouter;

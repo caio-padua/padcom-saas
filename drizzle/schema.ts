@@ -53,7 +53,7 @@ export type Consultant = typeof consultants.$inferSelect;
 // ─── ANAMNESIS QUESTIONS (CRUD dinâmico) ───────────────────────
 export const anamnesisQuestions = mysqlTable("anamnesis_questions", {
   id: int("id").autoincrement().primaryKey(),
-  category: mysqlEnum("category", ["integrativa", "estetica"]).notNull(),
+  category: mysqlEnum("category", ["integrativa", "estetica", "relato_diario"]).notNull(),
   section: varchar("section", { length: 100 }).notNull(),
   questionText: text("questionText").notNull(),
   fieldType: mysqlEnum("fieldType", ["text", "number", "scale", "select", "multiselect", "checkbox", "date", "textarea"]).notNull(),
@@ -63,6 +63,15 @@ export const anamnesisQuestions = mysqlTable("anamnesis_questions", {
   isRequired: boolean("isRequired").default(false).notNull(),
   sortOrder: int("sortOrder").default(0).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  code: varchar("code", { length: 50 }),
+  block: varchar("block", { length: 50 }),
+  step: int("step"),
+  clinicalGoal: text("clinicalGoal"),
+  commercialGoal: text("commercialGoal"),
+  helper: text("helper"),
+  technicalName: varchar("technicalName", { length: 255 }),
+  weight: decimal("weight", { precision: 5, scale: 2 }),
+  videoUrl: varchar("videoUrl", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -240,3 +249,104 @@ export const auditLog = mysqlTable("audit_log", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+
+// ─── SCORING WEIGHTS (motor de score V15) ─────────────────────
+export const scoringWeights = mysqlTable("scoring_weights", {
+  id: int("id").autoincrement().primaryKey(),
+  questionCode: varchar("questionCode", { length: 50 }).notNull(),
+  axis: varchar("axis", { length: 50 }).notNull(),
+  weight: decimal("weight", { precision: 5, scale: 2 }).notNull(),
+  maxRawPoints: int("maxRawPoints").default(10).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+});
+export type ScoringWeight = typeof scoringWeights.$inferSelect;
+
+// ─── SCORING BANDS (faixas de conduta) ────────────────────────
+export const scoringBands = mysqlTable("scoring_bands", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 50 }).notNull(),
+  minScore: int("minScore").notNull(),
+  maxScore: int("maxScore").notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 20 }),
+  actions: json("actions"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+});
+export type ScoringBand = typeof scoringBands.$inferSelect;
+
+// ─── MOTOR ACTIONS (regras determinísticas) ───────────────────
+export const motorActions = mysqlTable("motor_actions", {
+  id: int("id").autoincrement().primaryKey(),
+  triggerCode: varchar("triggerCode", { length: 50 }).notNull(),
+  triggerCondition: varchar("triggerCondition", { length: 100 }).notNull(),
+  actionType: mysqlEnum("actionType", ["formula", "exame", "encaminhamento", "alerta", "painel"]).notNull(),
+  actionValue: text("actionValue").notNull(),
+  priority: int("priority").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+});
+export type MotorAction = typeof motorActions.$inferSelect;
+
+// ─── CLINICAL FLAGS (validação humana obrigatória) ────────────
+export const clinicalFlags = mysqlTable("clinical_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  flagType: mysqlEnum("flagType", ["validation", "warning", "info"]).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  description: text("description").notNull(),
+  source: varchar("source", { length: 100 }),
+  sourceId: int("sourceId"),
+  status: mysqlEnum("status", ["pendente", "aprovado", "rejeitado"]).default("pendente").notNull(),
+  validatedById: int("validatedById"),
+  validatedAt: timestamp("validatedAt"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClinicalFlag = typeof clinicalFlags.$inferSelect;
+
+// ─── FUNNEL STATUS (funil comercial) ──────────────────────────
+export const funnelStatus = mysqlTable("funnel_status", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  stage: mysqlEnum("stage", ["iniciou_e_parou", "concluiu_clinico", "concluiu_financeiro", "alto_interesse", "convertido"]).notNull(),
+  scoreBand: varchar("scoreBand", { length: 50 }),
+  score: int("score"),
+  stoppedAtStep: int("stoppedAtStep"),
+  stoppedAtModule: varchar("stoppedAtModule", { length: 50 }),
+  notes: text("notes"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type FunnelStatus = typeof funnelStatus.$inferSelect;
+
+// ─── MEDICATIONS (matriz dosada V16) ──────────────────────────
+export const medications = mysqlTable("medications", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  dosageUnit: varchar("dosageUnit", { length: 50 }),
+  dosageValue: decimal("dosageValue", { precision: 10, scale: 2 }),
+  associatedDisease: varchar("associatedDisease", { length: 100 }),
+  morningQty: int("morningQty").default(0).notNull(),
+  afternoonQty: int("afternoonQty").default(0).notNull(),
+  nightQty: int("nightQty").default(0).notNull(),
+  totalDaily: int("totalDaily").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Medication = typeof medications.$inferSelect;
+
+// ─── FLOW CONFIG (governança e roteamento) ────────────────────
+export const flowConfig = mysqlTable("flow_config", {
+  id: int("id").autoincrement().primaryKey(),
+  configKey: varchar("configKey", { length: 100 }).notNull().unique(),
+  configValue: varchar("configValue", { length: 50 }).notNull(),
+  showToggle: boolean("showToggle").default(true).notNull(),
+  description: text("description"),
+  ifOn: text("ifOn"),
+  ifOff: text("ifOff"),
+  defaultProfile: varchar("defaultProfile", { length: 50 }),
+  notes: text("notes"),
+});
+export type FlowConfig = typeof flowConfig.$inferSelect;

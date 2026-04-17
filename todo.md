@@ -77,3 +77,94 @@
 - [x] Testes de períodos de relatos diários (manha, tarde, noite)
 - [x] Testes de tipos de relato de prescrição e severidades
 - [x] Testes de status de alertas e prioridades de regras
+
+## ═══════════════════════════════════════════════════════════
+## EVOLUÇÃO V2 — Integração Anamnesis-Helper + Roadmap V16
+## ═══════════════════════════════════════════════════════════
+
+## PASSO 1 — Motor de Score V15 (Backend)
+- [x] Tabela scoring_weights com pesos por código semântico (CARD_DOEN_HASA_001 etc.)
+- [x] Tabela scoring_bands com faixas de conduta (Básico 0-20, Intermediário 21-50, Avançado 51-80, Full 81-100)
+- [x] Tabela motor_actions com regras determinísticas (HAS→Painel cardiometabólico, Diabetes→Glicemia etc.)
+- [x] Tabela clinical_flags para validação humana obrigatória (infarto, AVC, medicamentos contínuos)
+- [x] Tabela funnel_status para funil comercial (INICIOU_E_PAROU, CONCLUIU_CLINICO, CONCLUIU_FINANCEIRO, ALTO_INTERESSE)
+- [x] Endpoint calculateScore que recebe respostas e retorna score 0-100 + faixa + ações + flags (scoring-engine.ts criado, precisa de testes específicos)
+- [x] Lógica de conversão de respostas em pontos brutos (scoring-engine.ts, precisa de testes unitários)
+
+## PASSO 2 — 34 Perguntas Semânticas V15 (Seed + Schema)
+- [x] Adicionar campos ao schema de perguntas: code semântico, block clínico, step (1-5), clinicalGoal, commercialGoal, helper, technicalName, weight
+- [ ] Seed das 34 perguntas dos 5 módulos com todos os metadados
+- [ ] Microtextos comerciais de transição entre etapas
+- [ ] Modal "Ver explicação" com technicalName por pergunta
+
+## PASSO 3 — Fluxo de Anamnese do Paciente em 5 Etapas
+- [ ] Página /anamnese com progress bar de 5 etapas e sticky CTA
+- [ ] Módulo 1: Dados + clínico básico (9 perguntas)
+- [ ] Módulo 2: Sintomas funcionais (6 perguntas)
+- [ ] Módulo 3: Cirurgias, medicamentos, atividade (9 perguntas)
+- [ ] Módulo 4: Preferências terapêuticas (7 perguntas)
+- [ ] Módulo 5: Financeiro (2 perguntas + microtextos)
+- [ ] Página /anamnese/concluido com score animado + faixa + ações + flags
+- [ ] Autosave em localStorage via useDraft hook
+- [ ] Modo Demonstração com 3 perfis fictícios (Mariana básico, Carlos avançado, Helena full)
+
+## PASSO 4 — Dashboard Clínico Avançado
+- [x] Página de Funil com visualização por estágio e chips de contagem
+- [ ] Fila da equipe (/admin) com lista de pacientes por estágio do funil
+- [ ] Busca por nome + filtros avançados (faixa de score, origem, módulo de parada)
+- [ ] Detalhe do paciente com matriz por sistema clínico (cardio, metabólico, endo, sono, intestino, hormonal, humor)
+- [ ] CTA "Validar e enviar protocolo" (bloqueado se houver flag de validação pendente)
+- [x] Gráficos Recharts: barras por faixa + funil no dashboard
+- [x] Radar de score clínico no dashboard (dados placeholder, precisa conectar ao backend)
+- [ ] Gráfico de atividade recente baseado em dados reais
+- [ ] Radar com dados clínicos reais por paciente (substituir hardcoded)
+
+## PASSO 5 — Painéis por Sistema Clínico (V16)
+- [ ] Painel Cardiovascular: checkboxes HAS, infarto, AVC, IC, arritmia, valvulopatia com status diagnosticado/potencial
+- [ ] Painel Metabólico: diabetes, dislipidemia, obesidade, resistência insulínica
+- [ ] Painel Endócrino: hipotireoidismo, Hashimoto, hipertireoidismo
+- [ ] Painel Digestivo: intestino, DRGE, esteatose
+- [ ] Painel Neuro/Humor: ansiedade, depressão, TDAH, insônia
+- [ ] Sono detalhado: 4 sub-escalas (pegar no sono, despertar, fragmentado, sonolência diurna)
+- [ ] Atividade física múltipla com sub-bloco (tipo, frequência, período, intensidade)
+
+## PASSO 6 — Medicamentos como Matriz Dosada
+- [x] Tabela medications com nome, dosagem, doença associada, distribuição manhã/tarde/noite
+- [x] Interface de cadastro de medicamentos com comprimidos por turno
+- [x] Total diário calculado automaticamente
+- [ ] Regras de polifarmácia e interações
+- [ ] Alerta automático quando limiar de polifarmácia é atingido
+
+## PASSO 7 — Validação Humana Configurável e Governança
+- [x] Config de fluxo com toggles ON/OFF: pré-triagem enfermagem, validação médico assistente, validação humana obrigatória
+- [ ] Roteamento por complexidade: casos de alto risco sobem automaticamente para supervisor
+- [x] Travas configuráveis na UI: oncologia, gestante, polifarmácia (toggles criados)
+- [ ] Lógica de trava aplicada nos fluxos/procedures do backend
+- [ ] Preview de sugestão clínica (nunca executa conduta sozinho)
+- [ ] Fila da equipe segmentada por perfil (enfermagem, médico assistente, supervisor)
+
+## PASSO 8 — Geração de PDF e Protocolo
+- [ ] Geração de PDF do protocolo final com score, faixa, ações, exames sugeridos
+- [ ] Assinatura digital do médico responsável
+- [ ] Envio do protocolo por WhatsApp ou e-mail
+
+## PASSO 9 — Funil Comercial e Captação
+- [x] Chips de funil no dashboard com contagem (atualização por query)
+- [ ] Detecção de abandono (INICIOU_E_PAROU) com encaminhamento para CRM
+- [ ] Classificação de alto interesse (plano completo + horizonte longo)
+- [ ] Previsão comercial por camada (Básico/Intermediário/Avançado/Full)
+
+## PASSO 10 — Multi-clínica e Escalabilidade
+- [ ] Tenancy por slug com branding configurável
+- [ ] Vídeo explicativo por pergunta (campo videoUrl + placeholder)
+- [ ] Recalibragem do motor para absorver novos campos V16
+- [ ] Disparo WhatsApp por turno (manhã/tarde/noite) com lembrete de medicação
+
+## Testes V2
+- [x] Testes do motor de score (scoring bands, motor actions, create/update)
+- [x] Testes de medication (CRUD, dosage matrix)
+- [x] Testes de clinical flags (validation input, statuses)
+- [x] Testes do funil comercial (stats, auth)
+- [x] Testes de flow config (list, update, auth)
+- [x] Testes do dashboard enhanced (patientTimeline, stats)
+- [x] 53 testes passando (3 arquivos de teste)

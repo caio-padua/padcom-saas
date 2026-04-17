@@ -4,7 +4,8 @@ import {
   InsertUser, users, patients, consultants, anamnesisQuestions,
   anamnesisSessions, anamnesisResponses, prescriptions, prescriptionComponents,
   dailyReports, prescriptionReports, alerts, alertRules, followUpSessions,
-  exams, auditLog
+  exams, auditLog, scoringWeights, scoringBands, motorActions, clinicalFlags,
+  funnelStatus, medications, flowConfig
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -291,17 +292,126 @@ export async function listAuditLogs(limit = 100) {
   return db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(limit);
 }
 
-// ─── DASHBOARD STATS ───────────────────────────────────────────
+//// ─── SCORING HELPERS ────────────────────────────────────────
+export async function listScoringWeights() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(scoringWeights).where(eq(scoringWeights.isActive, true));
+}
+export async function listScoringBands() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(scoringBands).orderBy(asc(scoringBands.sortOrder));
+}
+export async function listMotorActions(triggerCode?: string) {
+  const db = await getDb(); if (!db) return [];
+  if (triggerCode) return db.select().from(motorActions).where(and(eq(motorActions.triggerCode, triggerCode), eq(motorActions.isActive, true)));
+  return db.select().from(motorActions).where(eq(motorActions.isActive, true));
+}
+export async function createMotorAction(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(motorActions).values(data);
+  return r[0].insertId;
+}
+export async function updateMotorAction(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(motorActions).set(data).where(eq(motorActions.id, id));
+}
+export async function createScoringWeight(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(scoringWeights).values(data);
+  return r[0].insertId;
+}
+
+// ─── CLINICAL FLAGS HELPERS ──────────────────────────────────
+export async function listClinicalFlags(patientId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(clinicalFlags).where(eq(clinicalFlags.patientId, patientId)).orderBy(desc(clinicalFlags.createdAt));
+}
+export async function createClinicalFlag(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const r = await db.insert(clinicalFlags).values(data);
+  return r[0].insertId;
+}
+export async function updateClinicalFlag(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(clinicalFlags).set(data).where(eq(clinicalFlags.id, id));
+}
+
+// ─── FUNNEL HELPERS ─────────────────────────────────────────
+export async function getFunnelStatus(patientId: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(funnelStatus).where(eq(funnelStatus.patientId, patientId)).limit(1);
+  return r[0] ?? undefined;
+}
+export async function upsertFunnelStatus(patientId: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  const existing = await getFunnelStatus(patientId);
+  if (existing) {
+    await db.update(funnelStatus).set(data).where(eq(funnelStatus.patientId, patientId));
+  } else {
+    await db.insert(funnelStatus).values({ ...data, patientId });
+  }
+}
+export async function listFunnelStats() {
+  const db = await getDb(); if (!db) return [];
+  return db.select({ stage: funnelStatus.stage, count: sql<number>`count(*)` }).from(funnelStatus).groupBy(funnelStatus.stage);
+}
+
+// ─── MEDICATION HELPERS ──────────────────────────────────────
+export async function listMedications(patientId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(medications).where(eq(medications.patientId, patientId)).orderBy(desc(medications.createdAt));
+}
+export async function createMedication(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const total = (data.morningQty ?? 0) + (data.afternoonQty ?? 0) + (data.nightQty ?? 0);
+  const r = await db.insert(medications).values({ ...data, totalDaily: total });
+  return r[0].insertId;
+}
+export async function updateMedication(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  if (data.morningQty !== undefined || data.afternoonQty !== undefined || data.nightQty !== undefined) {
+    const med = await db.select().from(medications).where(eq(medications.id, id)).limit(1);
+    if (med[0]) {
+      data.totalDaily = (data.morningQty ?? Number(med[0].morningQty)) + (data.afternoonQty ?? Number(med[0].afternoonQty)) + (data.nightQty ?? Number(med[0].nightQty));
+    }
+  }
+  await db.update(medications).set(data).where(eq(medications.id, id));
+}
+export async function deleteMedication(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(medications).where(eq(medications.id, id));
+}
+
+// ─── FLOW CONFIG HELPERS ─────────────────────────────────────
+export async function listFlowConfigs() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(flowConfig);
+}
+export async function updateFlowConfig(key: string, value: string) {
+  const db = await getDb(); if (!db) return;
+  await db.update(flowConfig).set({ configValue: value }).where(eq(flowConfig.configKey, key));
+}
+export async function getFlowConfig(key: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const r = await db.select().from(flowConfig).where(eq(flowConfig.configKey, key)).limit(1);
+  return r[0] ?? undefined;
+}
+
+// ─── DASHBOARD STATS ─────────────────────────────────────────
 export async function getDashboardStats(userId: number) {
   const db = await getDb(); if (!db) return null;
   const [patientCount] = await db.select({ count: sql<number>`count(*)` }).from(patients);
   const [alertCount] = await db.select({ count: sql<number>`count(*)` }).from(alerts).where(eq(alerts.status, "ativo"));
   const [reportCount] = await db.select({ count: sql<number>`count(*)` }).from(prescriptionReports).where(eq(prescriptionReports.status, "aberto"));
   const [consultantCount] = await db.select({ count: sql<number>`count(*)` }).from(consultants).where(eq(consultants.isActive, true));
+  const [flagCount] = await db.select({ count: sql<number>`count(*)` }).from(clinicalFlags).where(eq(clinicalFlags.status, "pendente"));
+  const funnelStats = await listFunnelStats();
   return {
     totalPatients: patientCount?.count ?? 0,
     activeAlerts: alertCount?.count ?? 0,
     openReports: reportCount?.count ?? 0,
     activeConsultants: consultantCount?.count ?? 0,
+    pendingFlags: flagCount?.count ?? 0,
+    funnelStats,
   };
 }

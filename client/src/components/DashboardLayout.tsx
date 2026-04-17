@@ -24,7 +24,8 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Users, ClipboardList, Stethoscope, Sparkles,
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
-  UserCog, FlaskConical, CalendarCheck, TrendingUp
+  UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
+  Cog, Filter, Tablets, GitBranch
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -38,12 +39,17 @@ const menuItems = [
   { icon: Sparkles, label: "Anamnese Estética", path: "/anamnese-estetica" },
   { icon: FileHeart, label: "Relatos Diários", path: "/relatos-diarios" },
   { icon: Pill, label: "Prescrições", path: "/prescricoes" },
+  { icon: Tablets, label: "Medicamentos", path: "/medicamentos" },
   { icon: FlaskConical, label: "Exames", path: "/exames" },
   { icon: CalendarCheck, label: "Sessões", path: "/sessoes" },
+  { icon: TrendingUp, label: "Evolução", path: "/evolucao" },
   { icon: Bell, label: "Alertas", path: "/alertas" },
+  { icon: ShieldAlert, label: "Flags Clínicas", path: "/flags-clinicas" },
+  { icon: GitBranch, label: "Funil", path: "/funil" },
+  { icon: Cog, label: "Motor de Ações", path: "/motor-acoes" },
+  { icon: Filter, label: "Config. Fluxo", path: "/config-fluxo" },
   { icon: UserCog, label: "Consultoras", path: "/consultoras" },
   { icon: ClipboardList, label: "Perguntas", path: "/perguntas" },
-  { icon: TrendingUp, label: "Evolução", path: "/evolucao" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 

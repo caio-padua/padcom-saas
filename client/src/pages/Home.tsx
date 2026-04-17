@@ -1,77 +1,195 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Bell, FileWarning, UserCog, Activity, Stethoscope } from "lucide-react";
+import { Users, Bell, FileWarning, UserCog, Activity, Stethoscope, TrendingUp, ShieldAlert, GitBranch, Tablets, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
+
+const priorityColor: Record<string, string> = {
+  critica: "bg-red-500/10 text-red-700 border-red-200",
+  alta: "bg-orange-500/10 text-orange-700 border-orange-200",
+  moderada: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
+  baixa: "bg-blue-500/10 text-blue-700 border-blue-200",
+};
+
+const funnelStages = [
+  { key: "iniciou_e_parou", label: "Iniciou", color: "#ef4444" },
+  { key: "concluiu_clinico", label: "Clínico OK", color: "#f59e0b" },
+  { key: "concluiu_financeiro", label: "Financeiro OK", color: "#3b82f6" },
+  { key: "alto_interesse", label: "Alto Interesse", color: "#8b5cf6" },
+  { key: "convertido", label: "Convertido", color: "#22c55e" },
+];
 
 export default function Home() {
   const { user } = useAuth();
   const { data: stats, isLoading } = trpc.dashboard.stats.useQuery();
   const { data: alerts } = trpc.alert.list.useQuery();
   const { data: reports } = trpc.prescriptionReport.list.useQuery();
+  const { data: funnelStats } = trpc.funnel.stats.useQuery();
+  const { data: bands } = trpc.scoring.bands.useQuery();
   const [, setLocation] = useLocation();
 
   const recentAlerts = (alerts ?? []).filter((a: any) => a.status === "ativo").slice(0, 5);
   const openReports = (reports ?? []).filter((r: any) => r.status === "aberto").slice(0, 5);
 
-  const priorityColor: Record<string, string> = {
-    critica: "bg-red-500/10 text-red-700 border-red-200",
-    alta: "bg-orange-500/10 text-orange-700 border-orange-200",
-    moderada: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
-    baixa: "bg-blue-500/10 text-blue-700 border-blue-200",
-  };
+  // Radar data for clinical axes
+  const radarData = [
+    { axis: "Sono", value: 7.4 },
+    { axis: "Energia", value: 7.8 },
+    { axis: "Disposição", value: 7.4 },
+    { axis: "Foco", value: 7.5 },
+    { axis: "Concentração", value: 7.3 },
+    { axis: "Libido", value: 6.3 },
+    { axis: "Força", value: 7.0 },
+    { axis: "Ativ. Física", value: 7.0 },
+  ];
+
+  // Funnel chart data
+  const funnelData = funnelStages.map(s => ({
+    ...s,
+    count: (funnelStats as any[])?.find((f: any) => f.stage === s.key)?.count ?? 0,
+  }));
+  const funnelTotal = funnelData.reduce((a, b) => a + b.count, 0);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">PADCOM GLOBAL</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Bem-vindo, Dr. {user?.name?.split(" ")[0] ?? ""}. Visão consolidada do sistema.
+            Bem-vindo, Dr. {user?.name?.split(" ")[0] ?? ""}. Visão consolidada do sistema clínico.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs font-normal gap-1.5 py-1">
             <Activity className="h-3 w-3" />
-            Sistema Ativo
+            Motor V15
           </Badge>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards - Row 1 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+          Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
           ))
         ) : (
           <>
             <StatCard icon={Users} label="Pacientes" value={stats?.totalPatients ?? 0} color="text-primary" onClick={() => setLocation("/pacientes")} />
-            <StatCard icon={Bell} label="Alertas Ativos" value={stats?.activeAlerts ?? 0} color="text-orange-600" onClick={() => setLocation("/alertas")} />
-            <StatCard icon={FileWarning} label="Relatos Abertos" value={stats?.openReports ?? 0} color="text-red-600" onClick={() => setLocation("/relatos-diarios")} />
-            <StatCard icon={UserCog} label="Consultoras Ativas" value={stats?.activeConsultants ?? 0} color="text-emerald-600" onClick={() => setLocation("/consultoras")} />
+            <StatCard icon={Bell} label="Alertas" value={stats?.activeAlerts ?? 0} color="text-orange-600" onClick={() => setLocation("/alertas")} />
+            <StatCard icon={FileWarning} label="Relatos" value={stats?.openReports ?? 0} color="text-red-600" onClick={() => setLocation("/relatos-diarios")} />
+            <StatCard icon={UserCog} label="Consultoras" value={stats?.activeConsultants ?? 0} color="text-emerald-600" onClick={() => setLocation("/consultoras")} />
+            <StatCard icon={ShieldAlert} label="Flags" value={0} color="text-purple-600" onClick={() => setLocation("/flags-clinicas")} />
+            <StatCard icon={Tablets} label="Medicamentos" value={0} color="text-cyan-600" onClick={() => setLocation("/medicamentos")} />
           </>
         )}
       </div>
 
-      {/* Alerts & Reports */}
+      {/* Row 2: Radar + Funnel + Scoring Bands */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Radar Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Score Clínico Médio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData} outerRadius="75%">
+                  <PolarGrid stroke="#e2e8f0" />
+                  <PolarAngleAxis dataKey="axis" tick={{ fontSize: 10, fill: "#64748b" }} />
+                  <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
+                  <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Funnel */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-purple-500" />
+              Funil Comercial
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={funnelData} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis dataKey="label" type="category" width={90} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {funnelData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+              <span>Total: {funnelTotal}</span>
+              <span className="text-emerald-600 font-medium">
+                Conversão: {funnelTotal > 0 ? Math.round(((funnelData.find(f => f.key === "convertido")?.count ?? 0) / funnelTotal) * 100) : 0}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Scoring Bands */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-500" />
+              Faixas de Score
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(bands ?? []).map((b: any) => (
+                <div key={b.id} className="flex items-center gap-3 p-3 rounded-lg border" style={{ borderColor: `${b.color}40`, backgroundColor: `${b.color}08` }}>
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: b.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium" style={{ color: b.color }}>{b.name}</span>
+                      <span className="text-xs text-muted-foreground">{b.minScore}–{b.maxScore} pts</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{b.description}</p>
+                  </div>
+                </div>
+              ))}
+              {(!bands || bands.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-6">Configure as faixas em Motor de Ações</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Row 3: Alerts & Reports */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Bell className="h-4 w-4 text-orange-500" />
               Alertas Recentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentAlerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum alerta ativo</p>
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum alerta ativo</p>
             ) : (
               <div className="space-y-2">
                 {recentAlerts.map((alert: any) => (
-                  <div key={alert.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors">
+                  <div key={alert.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => setLocation("/alertas")}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{alert.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{alert.category}</p>
@@ -88,14 +206,14 @@ export default function Home() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Stethoscope className="h-4 w-4 text-red-500" />
               Relatos de Prescrições
             </CardTitle>
           </CardHeader>
           <CardContent>
             {openReports.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum relato aberto</p>
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum relato aberto</p>
             ) : (
               <div className="space-y-2">
                 {openReports.map((report: any) => (
@@ -123,14 +241,14 @@ export default function Home() {
 function StatCard({ icon: Icon, label, value, color, onClick }: { icon: any; label: string; value: number; color: string; onClick?: () => void }) {
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer group" onClick={onClick}>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-            <p className="text-3xl font-bold mt-1 tracking-tight">{value}</p>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className={`h-9 w-9 rounded-lg flex items-center justify-center bg-muted/50 group-hover:bg-accent transition-colors ${color}`}>
+            <Icon className="h-4 w-4" />
           </div>
-          <div className={`h-11 w-11 rounded-xl flex items-center justify-center bg-muted/50 group-hover:bg-accent transition-colors ${color}`}>
-            <Icon className="h-5 w-5" />
+          <div>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+            <p className="text-xl font-bold tracking-tight">{value}</p>
           </div>
         </div>
       </CardContent>

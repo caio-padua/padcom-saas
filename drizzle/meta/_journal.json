@@ -15,6 +15,13 @@
       "when": 1776396571211,
       "tag": "0001_needy_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776402992373,
+      "tag": "0002_wakeful_tempest",
+      "breakpoints": true
     }
   ]
 }
