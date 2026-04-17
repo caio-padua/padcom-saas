@@ -15,13 +15,14 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 
 // ─── PATIENT ROUTER ────────────────────────────────────────────
 const patientRouter = router({
-  list: protectedProcedure.query(async () => db.listPatients()),
+  list: protectedProcedure.input(z.object({ clinicId: z.number().optional() }).optional()).query(async ({ input }) => db.listPatients(undefined, input?.clinicId)),
   get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => db.getPatient(input.id)),
   getByToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => db.getPatientByToken(input.token)),
   create: protectedProcedure.input(z.object({
     name: z.string().min(1), cpf: z.string().optional(), birthDate: z.string().optional(),
     sex: z.enum(["M", "F", "O"]).optional(), phone: z.string().optional(),
     email: z.string().optional(), notes: z.string().optional(),
+    clinicId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const token = nanoid(32);
     const id = await db.createPatient({ ...input, accessToken: token, createdById: ctx.user.id });
@@ -42,11 +43,12 @@ const patientRouter = router({
 
 // ─── CONSULTANT ROUTER ─────────────────────────────────────────
 const consultantRouter = router({
-  list: protectedProcedure.query(async () => db.listConsultants()),
+  list: protectedProcedure.input(z.object({ clinicId: z.number().optional() }).optional()).query(async ({ input }) => db.listConsultants(input?.clinicId)),
   create: adminProcedure.input(z.object({
     name: z.string().min(1), role: z.enum(["enfermeira", "biomedica", "nutricionista", "esteticista", "outro"]),
     email: z.string().optional(), phone: z.string().optional(),
     canAccessIntegrative: z.boolean().optional(), canAccessAesthetic: z.boolean().optional(), canAccessReports: z.boolean().optional(),
+    clinicId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createConsultant(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "consultant", entityId: id ?? undefined });
@@ -71,10 +73,10 @@ const consultantRouter = router({
 
 // ─── ANAMNESIS QUESTION ROUTER ─────────────────────────────────
 const questionRouter = router({
-  list: protectedProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]).optional() }).optional())
-    .query(async ({ input }) => db.listQuestions(input?.category as any)),
-  listPublic: publicProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]) }))
-    .query(async ({ input }) => db.listQuestions(input.category as any)),
+  list: protectedProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]).optional(), clinicId: z.number().optional() }).optional())
+    .query(async ({ input }) => db.listQuestions(input?.category as any, input?.clinicId)),
+  listPublic: publicProcedure.input(z.object({ category: z.enum(["integrativa", "estetica", "relato_diario"]), clinicId: z.number().optional() }))
+    .query(async ({ input }) => db.listQuestions(input.category as any, input.clinicId)),
   create: adminProcedure.input(z.object({
     category: z.enum(["integrativa", "estetica", "relato_diario"]), section: z.string().min(1),
     questionText: z.string().min(1),
@@ -85,6 +87,7 @@ const questionRouter = router({
     clinicalGoal: z.string().optional(), commercialGoal: z.string().optional(),
     helper: z.string().optional(), technicalName: z.string().optional(),
     weight: z.string().optional(), videoUrl: z.string().optional(),
+    clinicId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const id = await db.createQuestion(input);
     await db.logAudit({ userId: ctx.user.id, action: "create", entity: "question", entityId: id ?? undefined });
@@ -173,7 +176,7 @@ const anamnesisRouter = router({
 
 // ─── PRESCRIPTION ROUTER ───────────────────────────────────────
 const prescriptionRouter = router({
-  list: protectedProcedure.input(z.object({ patientId: z.number() })).query(async ({ input }) => db.listPrescriptions(input.patientId)),
+  list: protectedProcedure.input(z.object({ patientId: z.number(), clinicId: z.number().optional() })).query(async ({ input }) => db.listPrescriptions(input.patientId, input.clinicId)),
   listByToken: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
     const patient = await db.getPatientByToken(input.token);
     if (!patient) throw new TRPCError({ code: "NOT_FOUND" });
@@ -184,6 +187,7 @@ const prescriptionRouter = router({
     form: z.string().optional(), dosage: z.string().optional(), frequency: z.string().optional(),
     duration: z.string().optional(), objective: z.string().optional(),
     components: z.array(z.object({ componentName: z.string(), dosage: z.string().optional(), unit: z.string().optional(), notes: z.string().optional() })).optional(),
+    clinicId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const { components, ...prescData } = input;
     const id = await db.createPrescription(prescData);
@@ -204,7 +208,7 @@ const prescriptionRouter = router({
 
 // ─── DAILY REPORT ROUTER ───────────────────────────────────────
 const dailyReportRouter = router({
-  list: protectedProcedure.input(z.object({ patientId: z.number(), limit: z.number().optional() })).query(async ({ input }) => db.listDailyReports(input.patientId, input.limit)),
+  list: protectedProcedure.input(z.object({ patientId: z.number(), limit: z.number().optional(), clinicId: z.number().optional() })).query(async ({ input }) => db.listDailyReports(input.patientId, input.limit, input.clinicId)),
   create: publicProcedure.input(z.object({
     token: z.string().optional(), patientId: z.number().optional(),
     reportDate: z.string(), period: z.enum(["manha", "tarde", "noite"]),
@@ -213,6 +217,7 @@ const dailyReportRouter = router({
     strength: z.string().optional(), physicalActivity: z.string().optional(),
     systolicBP: z.number().optional(), diastolicBP: z.number().optional(),
     weight: z.string().optional(), generalNotes: z.string().optional(),
+    clinicId: z.number().optional(),
   })).mutation(async ({ input }) => {
     let pId = input.patientId;
     if (input.token && !pId) {
@@ -221,8 +226,8 @@ const dailyReportRouter = router({
       pId = patient.id;
     }
     if (!pId) throw new TRPCError({ code: "BAD_REQUEST", message: "Patient ID required" });
-    const { token, ...data } = input;
-    const id = await db.createDailyReport({ ...data, patientId: pId });
+    const { token, clinicId, ...data } = input;
+    const id = await db.createDailyReport({ ...data, patientId: pId, clinicId });
     return { id };
   }),
 });
@@ -264,7 +269,7 @@ const prescriptionReportRouter = router({
 
 // ─── ALERT ROUTER ──────────────────────────────────────────────
 const alertRouter = router({
-  list: protectedProcedure.input(z.object({ patientId: z.number().optional() }).optional()).query(async ({ input }) => db.listAlerts(input?.patientId)),
+  list: protectedProcedure.input(z.object({ patientId: z.number().optional(), clinicId: z.number().optional() }).optional()).query(async ({ input }) => db.listAlerts(input?.patientId, input?.clinicId)),
   update: protectedProcedure.input(z.object({
     id: z.number(), status: z.enum(["ativo", "em_analise", "resolvido", "descartado"]).optional(),
     assignedToId: z.number().optional(), resolutionNotes: z.string().optional(),

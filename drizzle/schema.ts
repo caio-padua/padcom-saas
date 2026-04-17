@@ -74,6 +74,7 @@ export const anamnesisQuestions = mysqlTable("anamnesis_questions", {
   technicalName: varchar("technicalName", { length: 255 }),
   weight: decimal("weight", { precision: 5, scale: 2 }),
   videoUrl: varchar("videoUrl", { length: 500 }),
+  clinicId: int("clinicId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -121,6 +122,7 @@ export const prescriptions = mysqlTable("prescriptions", {
   objective: text("objective"),
   status: mysqlEnum("status", ["ativa", "pausada", "encerrada"]).default("ativa").notNull(),
   prescribedAt: timestamp("prescribedAt").defaultNow().notNull(),
+  clinicId: int("clinicId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -156,6 +158,7 @@ export const dailyReports = mysqlTable("daily_reports", {
   diastolicBP: int("diastolicBP"),
   weight: decimal("weight", { precision: 5, scale: 1 }),
   generalNotes: text("generalNotes"),
+  clinicId: int("clinicId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type DailyReport = typeof dailyReports.$inferSelect;
@@ -190,6 +193,7 @@ export const alerts = mysqlTable("alerts", {
   assignedToId: int("assignedToId"),
   resolvedAt: timestamp("resolvedAt"),
   resolutionNotes: text("resolutionNotes"),
+  clinicId: int("clinicId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

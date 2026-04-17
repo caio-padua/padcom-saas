@@ -162,7 +162,7 @@
 
 ## PASSO 10 — Multi-clínica e Escalabilidade
 - [x] Tabela clinics com CRUD, color picker, planos Starter/Pro/Enterprise, URL por slug
-- [x] Scoping real multi-tenant: clinicId adicionado a patients e consultants no schema + migração V5 aplicada + helpers listPatients/listConsultants filtram por clinicId
+- [x] Scoping real multi-tenant completo: clinicId adicionado a patients, consultants, anamnesis_questions, prescriptions, daily_reports e alerts (migrações V5+V6 aplicadas) + helpers listPatients/listConsultants/listQuestions/listPrescriptions/listDailyReports/listAlerts filtram por clinicId
 - [x] Portal slug-aware: rotas /c/:slug/:token e /c/:slug/:token/:tab com branding dinâmico da clínica (nome, cor primária, logo via clinic.getBySlug, fallback com inicial do nome)
 - [x] Vídeo explicativo por pergunta (campo videoUrl no schema + UI no CRUD de perguntas com expandível)
 - [x] Flag informativa V16 para valores altos em escalas (>80% do máximo)
@@ -178,7 +178,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 107 testes passando (6 arquivos de teste)
+- [x] 138 testes passando (7 arquivos de teste)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
@@ -187,9 +187,20 @@
 - [x] Página Protocolos (criação, assinatura e envio)
 
 ## Evolução Futura (Backlog)
-- [ ] Expandir multi-tenancy: adicionar clinicId a anamnesis_questions, prescriptions, daily_reports, alerts e filtrar nos helpers/routers
+- [x] Expandir multi-tenancy: clinicId adicionado a anamnesis_questions, prescriptions, daily_reports, alerts com migração V6 + helpers atualizados + 20 testes V6
 - [ ] Integração com Trello para cards de alertas
 - [ ] Notificações push para médico e consultoras
 - [ ] Integração com calendário (agendamento de consultas)
 - [ ] Exportação de dados em CSV/Excel
 - [ ] Modo offline para relatos do paciente (PWA)
+
+## V6 — Correções Multi-Tenancy (Scoping Completo)
+- [x] Routers de patient, consultant, question, prescription, dailyReport e alert aceitam clinicId opcional via input e repassam aos helpers de listagem
+- [x] Inputs de criação de patient/consultant/question/prescription/dailyReport aceitam clinicId opcional e propagam ao DB
+- [x] 31 testes unitários verificando propagação de clinicId nos routers e auth gates (v6-multitenant.test.ts)
+
+## Pendências de Scoping Multi-Tenant (Backlog Técnico)
+- [ ] Fluxos listByToken/patient portal: propagar clinicId do paciente automaticamente
+- [ ] scoring-engine: listQuestions global precisa de scoping por clínica quando aplicável
+- [ ] Auto-alerts criados em prescriptionReport/exam: propagar clinicId do paciente
+- [ ] Testes de isolamento real entre clínicas (fixtures com dados de múltiplas clínicas)

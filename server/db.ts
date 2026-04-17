@@ -102,9 +102,12 @@ export async function deleteConsultant(id: number) {
 }
 
 // ─── ANAMNESIS QUESTION HELPERS ────────────────────────────────
-export async function listQuestions(category?: "integrativa" | "estetica") {
+export async function listQuestions(category?: "integrativa" | "estetica" | "relato_diario", clinicId?: number) {
   const db = await getDb(); if (!db) return [];
-  if (category) return db.select().from(anamnesisQuestions).where(eq(anamnesisQuestions.category, category)).orderBy(asc(anamnesisQuestions.sortOrder));
+  const conditions = [];
+  if (category) conditions.push(eq(anamnesisQuestions.category, category));
+  if (clinicId) conditions.push(eq(anamnesisQuestions.clinicId, clinicId));
+  if (conditions.length > 0) return db.select().from(anamnesisQuestions).where(and(...conditions)).orderBy(asc(anamnesisQuestions.sortOrder));
   return db.select().from(anamnesisQuestions).orderBy(asc(anamnesisQuestions.sortOrder));
 }
 
@@ -159,9 +162,11 @@ export async function saveResponses(sessionId: number, responses: any[]) {
 }
 
 // ─── PRESCRIPTION HELPERS ──────────────────────────────────────
-export async function listPrescriptions(patientId: number) {
+export async function listPrescriptions(patientId: number, clinicId?: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(prescriptions).where(eq(prescriptions.patientId, patientId)).orderBy(desc(prescriptions.createdAt));
+  const conditions = [eq(prescriptions.patientId, patientId)];
+  if (clinicId) conditions.push(eq(prescriptions.clinicId, clinicId));
+  return db.select().from(prescriptions).where(and(...conditions)).orderBy(desc(prescriptions.createdAt));
 }
 
 export async function createPrescription(data: any) {
@@ -189,9 +194,11 @@ export async function savePrescriptionComponents(prescriptionId: number, compone
 }
 
 // ─── DAILY REPORT HELPERS ──────────────────────────────────────
-export async function listDailyReports(patientId: number, limit = 30) {
+export async function listDailyReports(patientId: number, limit = 30, clinicId?: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(dailyReports).where(eq(dailyReports.patientId, patientId)).orderBy(desc(dailyReports.reportDate)).limit(limit);
+  const conditions = [eq(dailyReports.patientId, patientId)];
+  if (clinicId) conditions.push(eq(dailyReports.clinicId, clinicId));
+  return db.select().from(dailyReports).where(and(...conditions)).orderBy(desc(dailyReports.reportDate)).limit(limit);
 }
 
 export async function createDailyReport(data: any) {
@@ -219,9 +226,12 @@ export async function updatePrescriptionReport(id: number, data: any) {
 }
 
 // ─── ALERT HELPERS ─────────────────────────────────────────────
-export async function listAlerts(patientId?: number) {
+export async function listAlerts(patientId?: number, clinicId?: number) {
   const db = await getDb(); if (!db) return [];
-  if (patientId) return db.select().from(alerts).where(eq(alerts.patientId, patientId)).orderBy(desc(alerts.createdAt));
+  const conditions = [];
+  if (patientId) conditions.push(eq(alerts.patientId, patientId));
+  if (clinicId) conditions.push(eq(alerts.clinicId, clinicId));
+  if (conditions.length > 0) return db.select().from(alerts).where(and(...conditions)).orderBy(desc(alerts.createdAt));
   return db.select().from(alerts).orderBy(desc(alerts.createdAt));
 }
 
