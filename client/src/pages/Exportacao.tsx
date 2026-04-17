@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Download, FileSpreadsheet, Users, ShoppingCart, AlertTriangle, Pill, Building2, ShieldCheck, ClipboardList, Microscope, UserCheck } from "lucide-react";
+import { Download, FileSpreadsheet, Users, ShoppingCart, AlertTriangle, Pill, Building2, ShieldCheck, ClipboardList, Microscope, UserCheck, FileText, Table2 } from "lucide-react";
 
 const ENTITIES = [
   { value: "patients", label: "Pacientes", icon: Users, description: "Dados cadastrais de todos os pacientes" },
@@ -20,8 +20,11 @@ const ENTITIES = [
   { value: "exams", label: "Exames", icon: Microscope, description: "Exames laboratoriais e de imagem" },
 ] as const;
 
+type ExportFormat = "csv" | "xlsx";
+
 export default function Exportacao() {
   const [selectedEntity, setSelectedEntity] = useState<string>("");
+  const [format, setFormat] = useState<ExportFormat>("xlsx");
   const [isExporting, setIsExporting] = useState(false);
 
   const preview = trpc.export.preview.useQuery(
@@ -31,8 +34,7 @@ export default function Exportacao() {
 
   const exportCsv = trpc.export.csv.useMutation({
     onSuccess: (data) => {
-      // Create and download CSV file
-      const BOM = "\uFEFF"; // UTF-8 BOM for Excel compatibility
+      const BOM = "\uFEFF";
       const blob = new Blob([BOM + data.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -42,7 +44,33 @@ export default function Exportacao() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success(`Exportação concluída: ${data.rowCount} registros`);
+      toast.success(`Exportação CSV concluída: ${data.rowCount} registros`);
+      setIsExporting(false);
+    },
+    onError: (err) => {
+      toast.error(`Erro na exportação: ${err.message}`);
+      setIsExporting(false);
+    },
+  });
+
+  const exportXlsx = trpc.export.xlsx.useMutation({
+    onSuccess: (data) => {
+      // Convert base64 to Blob
+      const binaryStr = atob(data.xlsxBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Exportação Excel concluída: ${data.rowCount} registros`);
       setIsExporting(false);
     },
     onError: (err) => {
@@ -57,7 +85,11 @@ export default function Exportacao() {
       return;
     }
     setIsExporting(true);
-    exportCsv.mutate({ entity: selectedEntity as any });
+    if (format === "xlsx") {
+      exportXlsx.mutate({ entity: selectedEntity as any });
+    } else {
+      exportCsv.mutate({ entity: selectedEntity as any });
+    }
   };
 
   const selectedInfo = ENTITIES.find(e => e.value === selectedEntity);
@@ -71,34 +103,63 @@ export default function Exportacao() {
           Exportação de Dados
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Exporte dados do sistema em formato CSV compatível com Excel, Google Sheets e outros softwares de planilha.
+          Exporte dados do sistema em formato CSV ou Excel (XLSX), compatível com Excel, Google Sheets e outros softwares de planilha.
         </p>
       </div>
 
-      {/* Entity Selection */}
+      {/* Entity Selection + Format */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Selecionar Entidade</CardTitle>
+          <CardTitle className="text-lg">Selecionar Entidade e Formato</CardTitle>
           <CardDescription>
-            Escolha qual conjunto de dados deseja exportar. O arquivo CSV será gerado com cabeçalhos em português.
+            Escolha qual conjunto de dados deseja exportar e em qual formato. Cabeçalhos são traduzidos para português automaticamente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Select value={selectedEntity} onValueChange={setSelectedEntity}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione a entidade para exportar..." />
-            </SelectTrigger>
-            <SelectContent>
-              {ENTITIES.map(e => (
-                <SelectItem key={e.value} value={e.value}>
-                  <span className="flex items-center gap-2">
-                    <e.icon className="h-4 w-4" />
-                    {e.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Entidade</label>
+              <p className="text-xs text-muted-foreground">Conjunto de dados a exportar</p>
+              <Select value={selectedEntity} onValueChange={setSelectedEntity}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione a entidade..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTITIES.map(e => (
+                    <SelectItem key={e.value} value={e.value}>
+                      <span className="flex items-center gap-2">
+                        <e.icon className="h-4 w-4" />
+                        {e.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Formato</label>
+              <p className="text-xs text-muted-foreground">Tipo de arquivo para download</p>
+              <div className="flex gap-2">
+                <Button
+                  variant={format === "xlsx" ? "default" : "outline"}
+                  className={format === "xlsx" ? "bg-emerald-600 hover:bg-emerald-700 flex-1" : "flex-1"}
+                  onClick={() => setFormat("xlsx")}
+                >
+                  <Table2 className="h-4 w-4 mr-2" />
+                  Excel (.xlsx)
+                </Button>
+                <Button
+                  variant={format === "csv" ? "default" : "outline"}
+                  className={format === "csv" ? "bg-emerald-600 hover:bg-emerald-700 flex-1" : "flex-1"}
+                  onClick={() => setFormat("csv")}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  CSV (.csv)
+                </Button>
+              </div>
+            </div>
+          </div>
 
           {selectedInfo && (
             <div className="rounded-lg border p-4 bg-muted/30 space-y-3">
@@ -108,30 +169,32 @@ export default function Exportacao() {
                 {preview.data && (
                   <Badge variant="secondary">{preview.data.count} registros</Badge>
                 )}
+                <Badge variant="outline" className="ml-auto">
+                  {format === "xlsx" ? "Excel" : "CSV"}
+                </Badge>
               </div>
               <p className="text-sm text-muted-foreground">{selectedInfo.description}</p>
             </div>
           )}
 
-          <div className="flex gap-3">
-            <Button
-              onClick={handleExport}
-              disabled={!selectedEntity || isExporting}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {isExporting ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Exportando...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar CSV
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            onClick={handleExport}
+            disabled={!selectedEntity || isExporting}
+            className="bg-emerald-600 hover:bg-emerald-700"
+            size="lg"
+          >
+            {isExporting ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar {format === "xlsx" ? "Excel" : "CSV"}
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
@@ -166,7 +229,8 @@ export default function Exportacao() {
         <CardContent className="p-4">
           <h3 className="font-semibold text-sm mb-1">Informações sobre a exportação</h3>
           <ul className="text-xs text-muted-foreground space-y-1">
-            <li>• O arquivo CSV é gerado com codificação UTF-8 BOM para compatibilidade com Excel</li>
+            <li>• <strong>Excel (.xlsx):</strong> Formato nativo do Microsoft Excel com colunas auto-dimensionadas</li>
+            <li>• <strong>CSV (.csv):</strong> Formato texto com codificação UTF-8 BOM para compatibilidade universal</li>
             <li>• Cabeçalhos são traduzidos para português automaticamente</li>
             <li>• Campos de data são formatados em ISO 8601 (AAAA-MM-DD)</li>
             <li>• Campos JSON são serializados como texto para preservar estrutura</li>

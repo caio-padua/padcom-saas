@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileHeart, Sun, Sunset, Moon, MessageSquare, Pill, Send, Clock } from "lucide-react";
+import { FileHeart, Sun, Sunset, Moon, MessageSquare, Pill, Send, Clock, Wifi, WifiOff, CloudUpload, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 
 export default function RelatosDiarios() {
   const { data: patients } = trpc.patient.list.useQuery();
@@ -18,6 +19,7 @@ export default function RelatosDiarios() {
   const [selectedPatient, setSelectedPatient] = useState<string>("");
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [whatsappTurno, setWhatsappTurno] = useState<"manha" | "tarde" | "noite">("manha");
+  const { isOnline, queueLength, syncing, syncQueue, addToQueue, pendingItems } = useOfflineSync();
   const [form, setForm] = useState({
     reportDate: new Date().toISOString().split("T")[0],
     period: "" as string,
@@ -40,22 +42,52 @@ export default function RelatosDiarios() {
   const handleSubmit = async () => {
     if (!selectedPatient) { toast.error("Selecione um paciente"); return; }
     if (!form.period) { toast.error("Selecione o período"); return; }
-    try {
-      await createReport.mutateAsync({
-        patientId: Number(selectedPatient),
-        reportDate: form.reportDate,
-        period: form.period as any,
-        sleep: String(form.sleep), energy: String(form.energy), mood: String(form.mood),
-        focus: String(form.focus), concentration: String(form.concentration), libido: String(form.libido),
-        strength: String(form.strength), physicalActivity: String(form.physicalActivity),
-        systolicBP: form.systolicBP ? Number(form.systolicBP) : undefined,
-        diastolicBP: form.diastolicBP ? Number(form.diastolicBP) : undefined,
-        weight: form.weight || undefined,
-        generalNotes: form.generalNotes || undefined,
+
+    const payload = {
+      patientId: Number(selectedPatient),
+      reportDate: form.reportDate,
+      period: form.period as any,
+      sleep: String(form.sleep), energy: String(form.energy), mood: String(form.mood),
+      focus: String(form.focus), concentration: String(form.concentration), libido: String(form.libido),
+      strength: String(form.strength), physicalActivity: String(form.physicalActivity),
+      systolicBP: form.systolicBP ? Number(form.systolicBP) : undefined,
+      diastolicBP: form.diastolicBP ? Number(form.diastolicBP) : undefined,
+      weight: form.weight || undefined,
+      generalNotes: form.generalNotes || undefined,
+    };
+
+    if (!isOnline) {
+      const patientName = selectedPatientData?.name ?? 'Paciente';
+      const periodLabel = form.period === 'manha' ? 'Manhã' : form.period === 'tarde' ? 'Tarde' : 'Noite';
+      addToQueue({
+        procedure: 'dailyReport.create',
+        input: payload,
+        timestamp: Date.now(),
+        label: `${patientName} — ${periodLabel} (${form.reportDate})`,
       });
+      toast.info("Sem conexão. Relato salvo localmente e será enviado quando a internet voltar.");
+      return;
+    }
+
+    try {
+      await createReport.mutateAsync(payload);
       toast.success("Relato registrado com sucesso!");
       refetchReports();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      if (e.message?.includes('fetch') || e.message?.includes('network') || e.message?.includes('Failed')) {
+        const patientName = selectedPatientData?.name ?? 'Paciente';
+        const periodLabel = form.period === 'manha' ? 'Manhã' : form.period === 'tarde' ? 'Tarde' : 'Noite';
+        addToQueue({
+          procedure: 'dailyReport.create',
+          input: payload,
+          timestamp: Date.now(),
+          label: `${patientName} — ${periodLabel} (${form.reportDate})`,
+        });
+        toast.info("Erro de rede. Relato salvo localmente para envio posterior.");
+      } else {
+        toast.error(e.message);
+      }
+    }
   };
 
   const periodIcon = { manha: Sun, tarde: Sunset, noite: Moon };
@@ -103,12 +135,35 @@ export default function RelatosDiarios() {
 
   return (
     <div className="space-y-6">
+      {/* Offline Status Banner */}
+      {(!isOnline || queueLength > 0) && (
+        <div className={`rounded-lg p-3 flex items-center justify-between ${isOnline ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
+          <div className="flex items-center gap-2">
+            {isOnline ? <Wifi className="h-4 w-4 text-amber-600" /> : <WifiOff className="h-4 w-4 text-red-600" />}
+            <span className="text-sm font-medium">
+              {!isOnline ? 'Modo Offline' : 'Conexão restaurada'}
+              {queueLength > 0 && ` — ${queueLength} relato${queueLength > 1 ? 's' : ''} na fila`}
+            </span>
+          </div>
+          {isOnline && queueLength > 0 && (
+            <Button size="sm" variant="outline" onClick={() => syncQueue()} disabled={syncing} className="gap-1.5">
+              {syncing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CloudUpload className="h-3.5 w-3.5" />}
+              {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <FileHeart className="h-6 w-6 text-primary" /> Relatos Diários
+            {isOnline
+              ? <Badge variant="outline" className="text-[10px] gap-1"><Wifi className="h-3 w-3 text-green-500" />Online</Badge>
+              : <Badge variant="destructive" className="text-[10px] gap-1"><WifiOff className="h-3 w-3" />Offline</Badge>
+            }
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Registro diário de sintomas e sinais vitais — sono, energia, humor, foco, PA, peso. Dados alimentam o motor de scoring e evolução clínica.</p>
+          <p className="text-sm text-muted-foreground mt-1">Registro diário de sintomas e sinais vitais — sono, energia, humor, foco, PA, peso. Dados alimentam o motor de scoring e evolução clínica. Funciona offline: relatos são salvos localmente e sincronizados quando a conexão voltar.</p>
         </div>
         {selectedPatient && selectedPatientData?.phone && (
           <Dialog open={whatsappOpen} onOpenChange={setWhatsappOpen}>
@@ -206,7 +261,32 @@ export default function RelatosDiarios() {
           </Card>
         </div>
 
-        <div>
+        <div className="space-y-4">
+          {/* Pending offline items */}
+          {pendingItems.length > 0 && (
+            <Card className="border-amber-200 dark:border-amber-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <WifiOff className="h-4 w-4 text-amber-500" />
+                  Pendentes Offline ({pendingItems.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {pendingItems.map((item, idx) => (
+                    <div key={`pending-${idx}`} className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 text-xs">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-medium">{item.label ?? item.procedure}</span>
+                        <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:text-amber-400">Pendente</Badge>
+                      </div>
+                      <p className="text-muted-foreground text-[10px]">Salvo em {new Date(item.timestamp).toLocaleString('pt-BR')}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader><CardTitle className="text-base">Histórico Recente</CardTitle></CardHeader>
             <CardContent>

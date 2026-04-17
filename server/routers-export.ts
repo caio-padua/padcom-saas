@@ -6,6 +6,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
+import * as XLSX from "xlsx";
 
 const entityEnum = z.enum([
   "patients", "leads", "prescriptions", "dispatches", "alerts",
@@ -128,6 +129,69 @@ export const exportRouter = router({
       return {
         csv,
         filename: `${entity}_export_${new Date().toISOString().slice(0, 10)}.csv`,
+        rowCount: rows.length,
+        entity,
+      };
+    }),
+
+  // XLSX (Excel) export
+  xlsx: protectedProcedure
+    .input(z.object({
+      entity: entityEnum,
+      clinicId: z.number().optional(),
+      limit: z.number().max(10000).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { entity, clinicId, limit } = input;
+      let rows: Record<string, any>[] = [];
+
+      switch (entity) {
+        case "patients": rows = await db.listPatients(limit, clinicId); break;
+        case "leads": rows = await db.listEntryLeads({ clinicId, limit }); break;
+        case "prescriptions": rows = await db.listPrescriptions(0, clinicId); break;
+        case "dispatches": rows = await db.listDispatches({ clinicId }); break;
+        case "alerts": rows = await db.listAlerts(limit, clinicId); break;
+        case "consultants": rows = await db.listConsultants(clinicId); break;
+        case "pharmacies": rows = await db.listPharmacies(clinicId); break;
+        case "validations": rows = await db.listValidationCascade({ clinicId }); break;
+        case "sessions": rows = await db.listSessions(0); break;
+        case "exams": rows = await db.listExams(0); break;
+        default:
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Entidade não suportada: ${entity}` });
+      }
+
+      // Flatten nested objects
+      const flatRows = rows.map(r => {
+        const flat: Record<string, any> = {};
+        for (const [k, v] of Object.entries(r)) {
+          if (v instanceof Date) flat[k] = v.toISOString();
+          else if (typeof v === "object" && v !== null) flat[k] = JSON.stringify(v);
+          else flat[k] = v;
+        }
+        return flat;
+      });
+
+      // Translate headers to PT-BR
+      const { translatedRows, headers } = translateHeaders(flatRows);
+
+      // Build XLSX workbook
+      const ws = XLSX.utils.json_to_sheet(translatedRows, { header: headers });
+      // Auto-size columns
+      const colWidths = headers.map(h => {
+        const maxLen = Math.max(h.length, ...translatedRows.map(r => String(r[h] ?? "").length));
+        return { wch: Math.min(maxLen + 2, 50) };
+      });
+      ws["!cols"] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, entity);
+
+      // Write to base64
+      const xlsxBuffer = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+
+      return {
+        xlsxBase64: xlsxBuffer,
+        filename: `${entity}_export_${new Date().toISOString().slice(0, 10)}.xlsx`,
         rowCount: rows.length,
         entity,
       };

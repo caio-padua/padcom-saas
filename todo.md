@@ -178,7 +178,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 227 testes passando (10 arquivos de teste, incluindo V10 + V11 + anastomose)
+- [x] 245 testes passando (11 arquivos de teste, incluindo V10 + V11 + V13 + anastomose)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
@@ -198,8 +198,8 @@
 - [ ] Trello: conectar API real com API key do usuário
 - [ ] Push notifications: integrar Firebase/OneSignal para push real
 - [ ] Calendário externo: sincronizar com Google Calendar/Outlook via API
-- [ ] Exportação XLSX: adicionar formato Excel além de CSV
-- [ ] PWA offline: integrar fila offline com formulários de relatos na UI
+- [x] Exportação XLSX: formato Excel com colunas auto-dimensionadas, cabeçalhos PT-BR, toggle CSV/XLSX na página Exportação
+- [x] PWA offline: integrado com formulário de Relatos Diários (banner offline, fila local, sync automático ao reconectar)
 
 ## V6 — Correções Multi-Tenancy (Scoping Completo)
 - [x] Routers de patient, consultant, question, prescription, dailyReport e alert aceitam clinicId opcional via input e repassam aos helpers de listagem
