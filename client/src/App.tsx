@@ -40,6 +40,9 @@ const Confianca = lazy(() => import("./pages/Confianca"));
 const WebhooksPage = lazy(() => import("./pages/Webhooks"));
 const ScoreRegulatorio = lazy(() => import("./pages/ScoreRegulatorio"));
 const Exportacao = lazy(() => import("./pages/Exportacao"));
+const Agendamentos = lazy(() => import("./pages/Agendamentos"));
+const Notificacoes = lazy(() => import("./pages/Notificacoes"));
+const Trello = lazy(() => import("./pages/Trello"));
 
 function PageLoader() {
   return (
@@ -84,6 +87,9 @@ function DashboardRouter() {
           <Route path="/webhooks" component={WebhooksPage} />
           <Route path="/score-regulatorio" component={ScoreRegulatorio} />
           <Route path="/exportacao" component={Exportacao} />
+          <Route path="/agendamentos" component={Agendamentos} />
+          <Route path="/notificacoes" component={Notificacoes} />
+          <Route path="/trello" component={Trello} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

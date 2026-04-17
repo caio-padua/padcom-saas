@@ -7,6 +7,10 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+import { registerServiceWorker } from "./hooks/useOfflineSync";
+
+// Register PWA service worker for offline support
+registerServiceWorker();
 
 const queryClient = new QueryClient();
 

@@ -178,7 +178,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 201 testes passando (9 arquivos de teste, incluindo V10 + anastomose)
+- [x] 227 testes passando (10 arquivos de teste, incluindo V10 + V11 + anastomose)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
@@ -188,11 +188,18 @@
 
 ## Evolução Futura (Backlog)
 - [x] Expandir multi-tenancy: clinicId adicionado a anamnesis_questions, prescriptions, daily_reports, alerts com migração V6 + helpers atualizados + 20 testes V6
-- [ ] Integração com Trello para cards de alertas
-- [ ] Notificações push para médico e consultoras
-- [ ] Integração com calendário (agendamento de consultas)
-- [ ] Exportação de dados em CSV/Excel
-- [ ] Modo offline para relatos do paciente (PWA)
+- [x] Trello: schema trelloCards + router CRUD + página Trello.tsx (estrutura interna pronta, integração real com API Trello pendente de API key)
+- [x] Notificações internas: schema internalNotifications + router CRUD + página Notificacoes.tsx (notificações in-app prontas, push real pendente de serviço externo)
+- [x] Agendamentos internos: schema appointments + router CRUD + página Agendamentos.tsx (agendamento interno pronto, sync com Google/Outlook pendente de API key)
+- [x] Exportação CSV: router export (pacientes, leads, prescrições, despachos, alertas) + página Exportacao.tsx
+- [x] PWA offline (estrutura): service worker sw.js + manifest.json + hook useOfflineSync + schema pwaSyncQueue (integração com UI de relatos pendente)
+
+### Pendentes para completar integrações externas:
+- [ ] Trello: conectar API real com API key do usuário
+- [ ] Push notifications: integrar Firebase/OneSignal para push real
+- [ ] Calendário externo: sincronizar com Google Calendar/Outlook via API
+- [ ] Exportação XLSX: adicionar formato Excel além de CSV
+- [ ] PWA offline: integrar fila offline com formulários de relatos na UI
 
 ## V6 — Correções Multi-Tenancy (Scoping Completo)
 - [x] Routers de patient, consultant, question, prescription, dailyReport e alert aceitam clinicId opcional via input e repassam aos helpers de listagem

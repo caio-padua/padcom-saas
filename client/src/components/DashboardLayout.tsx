@@ -26,7 +26,8 @@ import {
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
   UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
   Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle,
-  Building2, Cog, Filter, BarChart3, Store, ShieldCheck, Webhook, Scale, FileSpreadsheet
+  Building2, Cog, Filter, BarChart3, Store, ShieldCheck, Webhook, Scale, FileSpreadsheet,
+  Calendar, BellRing, Trello
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -62,6 +63,9 @@ const menuItems = [
   { icon: Webhook, label: "Webhooks", path: "/webhooks" },
   { icon: Scale, label: "Score Regulatório", path: "/score-regulatorio" },
   { icon: FileSpreadsheet, label: "Exportação CSV", path: "/exportacao" },
+  { icon: Calendar, label: "Agendamentos", path: "/agendamentos" },
+  { icon: BellRing, label: "Notificações", path: "/notificacoes" },
+  { icon: Trello, label: "Trello", path: "/trello" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 
