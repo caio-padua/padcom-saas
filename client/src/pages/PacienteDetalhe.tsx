@@ -3,9 +3,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Copy, MessageSquare, Stethoscope, Sparkles, FileHeart, Pill, FlaskConical, CalendarCheck, Bell } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Copy, MessageSquare, Pill, FlaskConical, CalendarCheck, Bell, FileHeart, Shield, TrendingUp, CheckCircle2 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import { useMemo } from "react";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+
+const SYSTEM_LABELS: Record<string, string> = {
+  cardio: "Cardiovascular",
+  metabolico: "Metabólico",
+  endocrino: "Endócrino",
+  sono: "Sono",
+  intestino: "Intestinal",
+  hormonal: "Hormonal",
+  humor: "Humor",
+  foco: "Foco",
+  energia: "Energia",
+  libido: "Libido",
+};
 
 export default function PacienteDetalhe() {
   const params = useParams<{ id: string }>();
@@ -13,10 +29,47 @@ export default function PacienteDetalhe() {
   const [, setLocation] = useLocation();
   const { data: patient, isLoading } = trpc.patient.get.useQuery({ id: patientId });
   const { data: prescriptions } = trpc.prescription.list.useQuery({ patientId });
-  const { data: dailyReports } = trpc.dailyReport.list.useQuery({ patientId, limit: 10 });
+  const { data: dailyReports } = trpc.dailyReport.list.useQuery({ patientId, limit: 20 });
   const { data: examsData } = trpc.exam.list.useQuery({ patientId });
   const { data: sessions } = trpc.followUp.list.useQuery({ patientId });
   const { data: alertsData } = trpc.alert.list.useQuery({ patientId });
+
+  // Build radar data from daily reports
+  const radarData = useMemo(() => {
+    if (!dailyReports?.length) return [];
+    const latest = dailyReports[0] as any;
+    const axes = [
+      { axis: "Sono", value: latest.sleep ?? 0 },
+      { axis: "Energia", value: latest.energy ?? 0 },
+      { axis: "Foco", value: latest.focus ?? 0 },
+      { axis: "Libido", value: latest.libido ?? 0 },
+      { axis: "Humor", value: latest.mood ?? 0 },
+      { axis: "Digestão", value: latest.digestion ?? 0 },
+    ].filter(a => a.value > 0);
+    return axes;
+  }, [dailyReports]);
+
+  // Build evolution chart from daily reports
+  const evolutionData = useMemo(() => {
+    if (!dailyReports?.length) return [];
+    return [...dailyReports].reverse().slice(-10).map((r: any) => ({
+      date: r.reportDate,
+      sono: r.sleep,
+      energia: r.energy,
+      foco: r.focus,
+      libido: r.libido,
+    }));
+  }, [dailyReports]);
+
+  // Calculate clinical score from latest reports
+  const clinicalScore = useMemo(() => {
+    if (!dailyReports?.length) return null;
+    const latest = dailyReports[0] as any;
+    const values = [latest.sleep, latest.energy, latest.focus, latest.libido, latest.mood, latest.digestion].filter(v => v != null && v > 0);
+    if (values.length === 0) return null;
+    const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+    return Math.round(avg * 10);
+  }, [dailyReports]);
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
   if (!patient) return <div className="p-8 text-center text-muted-foreground">Paciente não encontrado</div>;
@@ -35,9 +88,11 @@ export default function PacienteDetalhe() {
 
   const activePrescriptions = (prescriptions ?? []).filter((p: any) => p.status === "ativa");
   const activeAlerts = (alertsData ?? []).filter((a: any) => a.status === "ativo");
+  const hasPendingFlags = activeAlerts.some((a: any) => a.priority === "critica");
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/pacientes")}><ArrowLeft className="h-4 w-4" /></Button>
         <div className="flex-1">
@@ -50,14 +105,85 @@ export default function PacienteDetalhe() {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MiniStat icon={Pill} label="Fórmulas Ativas" value={activePrescriptions.length} />
-        <MiniStat icon={FileHeart} label="Relatos" value={dailyReports?.length ?? 0} />
-        <MiniStat icon={FlaskConical} label="Exames" value={examsData?.length ?? 0} />
-        <MiniStat icon={Bell} label="Alertas" value={activeAlerts.length} color={activeAlerts.length > 0 ? "text-orange-600" : undefined} />
+      {/* Score + Radar + CTA */}
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Clinical Score */}
+        <Card className="border-2 border-primary/10">
+          <CardContent className="p-6 text-center space-y-3">
+            <div className="text-4xl font-bold text-primary">{clinicalScore ?? "—"}</div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Score Clínico</p>
+            {clinicalScore != null && (
+              <Badge variant="outline" className={`text-xs ${clinicalScore >= 70 ? "bg-green-50 text-green-700" : clinicalScore >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+                {clinicalScore >= 70 ? "Ótimo" : clinicalScore >= 40 ? "Mediano" : "Atenção"}
+              </Badge>
+            )}
+            <Button
+              className="w-full gap-1.5 mt-2"
+              disabled={hasPendingFlags}
+              onClick={() => toast.success("Protocolo validado e enviado")}
+            >
+              {hasPendingFlags ? (
+                <><Shield className="h-4 w-4" /> Flags Pendentes</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4" /> Validar e Enviar Protocolo</>
+              )}
+            </Button>
+            {hasPendingFlags && (
+              <p className="text-xs text-destructive">Existem flags clínicas que precisam de validação humana antes de enviar o protocolo.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Radar Chart */}
+        <Card>
+          <CardHeader className="pb-0"><CardTitle className="text-sm">Radar por Eixo Clínico</CardTitle></CardHeader>
+          <CardContent className="p-2">
+            {radarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+                  <PolarGrid stroke="hsl(var(--border))" />
+                  <PolarAngleAxis dataKey="axis" tick={{ fontSize: 10 }} />
+                  <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                  <Radar name="Score" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-xs text-muted-foreground">Sem dados de relatos</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-2">
+          <MiniStat icon={Pill} label="Fórmulas" value={activePrescriptions.length} />
+          <MiniStat icon={FileHeart} label="Relatos" value={dailyReports?.length ?? 0} />
+          <MiniStat icon={FlaskConical} label="Exames" value={examsData?.length ?? 0} />
+          <MiniStat icon={Bell} label="Alertas" value={activeAlerts.length} color={activeAlerts.length > 0 ? "text-orange-600" : undefined} />
+        </div>
       </div>
 
+      {/* Evolution Chart */}
+      {evolutionData.length > 1 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Evolução dos Sintomas</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={evolutionData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="sono" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} name="Sono" />
+                <Line type="monotone" dataKey="energia" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="Energia" />
+                <Line type="monotone" dataKey="foco" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Foco" />
+                <Line type="monotone" dataKey="libido" stroke="#ec4899" strokeWidth={2} dot={{ r: 3 }} name="Libido" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabs */}
       <Tabs defaultValue="prescricoes" className="w-full">
         <TabsList className="grid w-full grid-cols-5 h-10">
           <TabsTrigger value="prescricoes" className="text-xs">Prescrições</TabsTrigger>
@@ -96,12 +222,15 @@ export default function PacienteDetalhe() {
                     <p className="font-medium text-sm">{r.reportDate}</p>
                     <Badge variant="outline" className="text-xs">{r.period === "manha" ? "Manhã" : r.period === "tarde" ? "Tarde" : "Noite"}</Badge>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    {r.sleep && <div><span className="text-muted-foreground">Sono:</span> {r.sleep}</div>}
-                    {r.energy && <div><span className="text-muted-foreground">Energia:</span> {r.energy}</div>}
-                    {r.focus && <div><span className="text-muted-foreground">Foco:</span> {r.focus}</div>}
-                    {r.libido && <div><span className="text-muted-foreground">Libido:</span> {r.libido}</div>}
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
+                    {r.sleep != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Sono</span><span className="font-bold text-sm">{r.sleep}</span></div>}
+                    {r.energy != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Energia</span><span className="font-bold text-sm">{r.energy}</span></div>}
+                    {r.focus != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Foco</span><span className="font-bold text-sm">{r.focus}</span></div>}
+                    {r.libido != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Libido</span><span className="font-bold text-sm">{r.libido}</span></div>}
+                    {r.mood != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Humor</span><span className="font-bold text-sm">{r.mood}</span></div>}
+                    {r.digestion != null && <div className="text-center p-1.5 rounded bg-muted/50"><span className="text-muted-foreground block">Digestão</span><span className="font-bold text-sm">{r.digestion}</span></div>}
                   </div>
+                  {r.notes && <p className="text-xs text-muted-foreground mt-2 italic">{r.notes}</p>}
                 </CardContent></Card>
               ))}
             </div>
@@ -119,7 +248,7 @@ export default function PacienteDetalhe() {
                     <p className="font-medium text-sm">{e.examName}</p>
                     <p className="text-xs text-muted-foreground">{e.examDate} | {e.value} {e.unit} (Ref: {e.referenceMin}-{e.referenceMax})</p>
                   </div>
-                  {e.classification && <Badge variant="outline" className="text-xs">{e.classification}</Badge>}
+                  {e.classification && <Badge variant="outline" className={`text-xs ${e.classification === "alto" || e.classification === "baixo" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{e.classification}</Badge>}
                 </CardContent></Card>
               ))}
             </div>

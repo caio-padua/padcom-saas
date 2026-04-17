@@ -405,6 +405,8 @@ export async function getDashboardStats(userId: number) {
   const [reportCount] = await db.select({ count: sql<number>`count(*)` }).from(prescriptionReports).where(eq(prescriptionReports.status, "aberto"));
   const [consultantCount] = await db.select({ count: sql<number>`count(*)` }).from(consultants).where(eq(consultants.isActive, true));
   const [flagCount] = await db.select({ count: sql<number>`count(*)` }).from(clinicalFlags).where(eq(clinicalFlags.status, "pendente"));
+  const [prescriptionCount] = await db.select({ count: sql<number>`count(*)` }).from(prescriptions).where(eq(prescriptions.status, "ativa"));
+  const [medicationCount] = await db.select({ count: sql<number>`count(*)` }).from(medications);
   const funnelStats = await listFunnelStats();
   return {
     totalPatients: patientCount?.count ?? 0,
@@ -412,6 +414,8 @@ export async function getDashboardStats(userId: number) {
     openReports: reportCount?.count ?? 0,
     activeConsultants: consultantCount?.count ?? 0,
     pendingFlags: flagCount?.count ?? 0,
+    activePrescriptions: prescriptionCount?.count ?? 0,
+    totalMedications: medicationCount?.count ?? 0,
     funnelStats,
   };
 }

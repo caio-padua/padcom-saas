@@ -93,31 +93,31 @@
 
 ## PASSO 2 — 34 Perguntas Semânticas V15 (Seed + Schema)
 - [x] Adicionar campos ao schema de perguntas: code semântico, block clínico, step (1-5), clinicalGoal, commercialGoal, helper, technicalName, weight
-- [ ] Seed das 34 perguntas dos 5 módulos com todos os metadados
-- [ ] Microtextos comerciais de transição entre etapas
-- [ ] Modal "Ver explicação" com technicalName por pergunta
+- [x] Seed das 34 perguntas dos 5 módulos com todos os metadados (34 perguntas + 16 pesos + 10 ações do motor)
+- [x] Microtextos comerciais de transição entre etapas
+- [x] Modal "Ver explicação" com technicalName por pergunta
 
 ## PASSO 3 — Fluxo de Anamnese do Paciente em 5 Etapas
-- [ ] Página /anamnese com progress bar de 5 etapas e sticky CTA
-- [ ] Módulo 1: Dados + clínico básico (9 perguntas)
-- [ ] Módulo 2: Sintomas funcionais (6 perguntas)
-- [ ] Módulo 3: Cirurgias, medicamentos, atividade (9 perguntas)
-- [ ] Módulo 4: Preferências terapêuticas (7 perguntas)
-- [ ] Módulo 5: Financeiro (2 perguntas + microtextos)
-- [ ] Página /anamnese/concluido com score animado + faixa + ações + flags
-- [ ] Autosave em localStorage via useDraft hook
-- [ ] Modo Demonstração com 3 perfis fictícios (Mariana básico, Carlos avançado, Helena full)
+- [x] Página /anamnese com progress bar de 5 etapas e sticky CTA
+- [x] Módulo 1: Dados + clínico básico (9 perguntas)
+- [x] Módulo 2: Sintomas funcionais (6 perguntas)
+- [x] Módulo 3: Cirurgias, medicamentos, atividade (9 perguntas)
+- [x] Módulo 4: Preferências terapêuticas (7 perguntas)
+- [x] Módulo 5: Financeiro (3 perguntas + microtextos)
+- [x] Página /anamnese/concluido com score animado + faixa + ações + flags
+- [x] Autosave em localStorage via useDraft hook
+- [x] Modo Demonstração com 3 perfis fictícios (Mariana básico, Carlos avançado, Helena full)
 
 ## PASSO 4 — Dashboard Clínico Avançado
 - [x] Página de Funil com visualização por estágio e chips de contagem
 - [ ] Fila da equipe (/admin) com lista de pacientes por estágio do funil
-- [ ] Busca por nome + filtros avançados (faixa de score, origem, módulo de parada)
-- [ ] Detalhe do paciente com matriz por sistema clínico (cardio, metabólico, endo, sono, intestino, hormonal, humor)
-- [ ] CTA "Validar e enviar protocolo" (bloqueado se houver flag de validação pendente)
+- [x] Busca por nome + filtros avançados (status, sexo, texto livre por nome/CPF/email/telefone)
+- [x] Detalhe do paciente com radar por eixo clínico (sono, energia, foco, libido, humor, digestão) + gráfico de evolução
+- [x] CTA "Validar e enviar protocolo" (bloqueado se houver flag de validação pendente)
 - [x] Gráficos Recharts: barras por faixa + funil no dashboard
-- [x] Radar de score clínico no dashboard (dados placeholder, precisa conectar ao backend)
-- [ ] Gráfico de atividade recente baseado em dados reais
-- [ ] Radar com dados clínicos reais por paciente (substituir hardcoded)
+- [x] Dashboard com funil, faixas de score, alertas e relatos com polling 30s
+- [x] Dashboard com busca rápida de pacientes e contadores reais (flags, prescrições ativas, medicamentos)
+- [x] Radar com dados clínicos reais por paciente no PacienteDetalhe (dados de dailyReports)
 
 ## PASSO 5 — Painéis por Sistema Clínico (V16)
 - [ ] Painel Cardiovascular: checkboxes HAS, infarto, AVC, IC, arritmia, valvulopatia com status diagnosticado/potencial
@@ -149,7 +149,7 @@
 - [ ] Envio do protocolo por WhatsApp ou e-mail
 
 ## PASSO 9 — Funil Comercial e Captação
-- [x] Chips de funil no dashboard com contagem (atualização por query)
+- [x] Chips de funil no dashboard com contagem (polling 30s)
 - [ ] Detecção de abandono (INICIOU_E_PAROU) com encaminhamento para CRM
 - [ ] Classificação de alto interesse (plano completo + horizonte longo)
 - [ ] Previsão comercial por camada (Básico/Intermediário/Avançado/Full)

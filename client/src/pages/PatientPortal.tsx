@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,10 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Stethoscope, Sun, Sunset, Moon, AlertTriangle, Check, ChevronRight, ChevronLeft } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Stethoscope, Sun, Sunset, Moon, AlertTriangle, Check, ChevronRight, ChevronLeft, Heart, Brain, Pill, Target, DollarSign, Info } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useParams } from "wouter";
 import { toast } from "sonner";
+
+const STEP_LABELS: Record<number, { title: string; subtitle: string; icon: any }> = {
+  1: { title: "Dados e Clínico Básico", subtitle: "Vamos conhecer você e seu histórico", icon: Heart },
+  2: { title: "Sintomas Funcionais", subtitle: "Como você está se sentindo?", icon: Brain },
+  3: { title: "Medicamentos e Hábitos", subtitle: "Seu histórico completo", icon: Pill },
+  4: { title: "Preferências", subtitle: "O tratamento ideal para você", icon: Target },
+  5: { title: "Informações Finais", subtitle: "Últimos detalhes", icon: DollarSign },
+};
 
 export default function PatientPortal() {
   const params = useParams<{ token: string; tab?: string }>();
@@ -67,6 +75,7 @@ export default function PatientPortal() {
   );
 }
 
+// ─── Daily Report Form ───────────────────────────────────────
 function DailyReportForm({ patientId }: { patientId: number }) {
   const createReport = trpc.dailyReport.create.useMutation();
   const [submitted, setSubmitted] = useState(false);
@@ -110,12 +119,15 @@ function DailyReportForm({ patientId }: { patientId: number }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Relato Diário</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Relato Diário</CardTitle>
+        <CardDescription className="text-xs">Registre como você está se sentindo hoje</CardDescription>
+      </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2"><Label className="text-xs">Data</Label><Input type="date" value={form.reportDate} onChange={e => setForm(f => ({ ...f, reportDate: e.target.value }))} /></div>
           <div className="space-y-2">
-            <Label className="text-xs">Período</Label>
+            <Label className="text-xs">Período *</Label>
             <div className="flex gap-1.5">
               {(["manha", "tarde", "noite"] as const).map(p => {
                 const Icon = periodIcon[p];
@@ -133,31 +145,48 @@ function DailyReportForm({ patientId }: { patientId: number }) {
 
         <div className="space-y-3">
           {[
-            { key: "sleep", label: "Sono" }, { key: "energy", label: "Energia" },
-            { key: "mood", label: "Humor" }, { key: "focus", label: "Foco" },
-            { key: "concentration", label: "Concentração" }, { key: "libido", label: "Libido" },
-            { key: "strength", label: "Força" }, { key: "physicalActivity", label: "Atividade Física" },
-          ].map(({ key, label }) => (
-            <div key={key} className="space-y-1.5">
-              <div className="flex justify-between"><Label className="text-xs">{label}</Label><span className="text-xs font-bold text-primary">{(form as any)[key]}</span></div>
+            { key: "sleep", label: "Sono", helper: "0 = péssimo, 10 = excelente" },
+            { key: "energy", label: "Energia", helper: "0 = sem energia, 10 = muito disposto" },
+            { key: "mood", label: "Humor", helper: "0 = muito deprimido, 10 = ótimo humor" },
+            { key: "focus", label: "Foco", helper: "0 = sem concentração, 10 = foco total" },
+            { key: "concentration", label: "Concentração", helper: "0 = disperso, 10 = concentrado" },
+            { key: "libido", label: "Libido", helper: "0 = ausente, 10 = muito presente" },
+            { key: "strength", label: "Força", helper: "0 = sem força, 10 = muito forte" },
+            { key: "physicalActivity", label: "Atividade Física", helper: "0 = sedentário, 10 = muito ativo" },
+          ].map(({ key, label, helper }) => (
+            <div key={key} className="space-y-1.5 p-3 rounded-lg border bg-card">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Label className="text-xs font-medium">{label}</Label>
+                  <p className="text-[10px] text-muted-foreground">{helper}</p>
+                </div>
+                <span className="text-lg font-bold text-primary min-w-[2rem] text-right">{(form as any)[key]}</span>
+              </div>
               <Slider value={[(form as any)[key]]} min={0} max={10} step={0.5} onValueChange={([v]) => setForm(f => ({ ...f, [key]: v }))} />
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-1"><Label className="text-[10px]">PA Sist.</Label><Input type="number" value={form.systolicBP} onChange={e => setForm(f => ({ ...f, systolicBP: e.target.value }))} placeholder="120" className="h-9 text-sm" /></div>
-          <div className="space-y-1"><Label className="text-[10px]">PA Diast.</Label><Input type="number" value={form.diastolicBP} onChange={e => setForm(f => ({ ...f, diastolicBP: e.target.value }))} placeholder="80" className="h-9 text-sm" /></div>
+          <div className="space-y-1"><Label className="text-[10px]">PA Sistólica</Label><Input type="number" value={form.systolicBP} onChange={e => setForm(f => ({ ...f, systolicBP: e.target.value }))} placeholder="120" className="h-9 text-sm" /></div>
+          <div className="space-y-1"><Label className="text-[10px]">PA Diastólica</Label><Input type="number" value={form.diastolicBP} onChange={e => setForm(f => ({ ...f, diastolicBP: e.target.value }))} placeholder="80" className="h-9 text-sm" /></div>
           <div className="space-y-1"><Label className="text-[10px]">Peso (kg)</Label><Input value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} placeholder="75" className="h-9 text-sm" /></div>
         </div>
 
         <div className="space-y-1"><Label className="text-xs">Observações</Label><Textarea value={form.generalNotes} onChange={e => setForm(f => ({ ...f, generalNotes: e.target.value }))} rows={2} placeholder="Como você está se sentindo hoje?" /></div>
-        <Button onClick={handleSubmit} className="w-full" disabled={createReport.isPending}>{createReport.isPending ? "Enviando..." : "Enviar Relato"}</Button>
+
+        {/* Sticky CTA */}
+        <div className="sticky bottom-4 pt-2">
+          <Button onClick={handleSubmit} className="w-full shadow-lg" size="lg" disabled={createReport.isPending}>
+            {createReport.isPending ? "Enviando..." : "Enviar Relato"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
+// ─── Prescription Reports ────────────────────────────────────
 function PrescriptionReports({ patientId }: { patientId: number }) {
   const { data: prescriptions } = trpc.prescription.list.useQuery({ patientId });
   const createReport = trpc.prescriptionReport.create.useMutation();
@@ -186,7 +215,7 @@ function PrescriptionReports({ patientId }: { patientId: number }) {
     <Card><CardContent className="p-8 text-center">
       <Check className="h-12 w-12 text-green-600 mx-auto mb-4" />
       <h2 className="text-lg font-semibold mb-2">Relato Enviado!</h2>
-      <p className="text-sm text-muted-foreground mb-4">A equipe médica será notificada sobre sua experiência.</p>
+      <p className="text-sm text-muted-foreground mb-4">A equipe médica será notificada sobre sua experiência com a fórmula.</p>
       <Button onClick={() => { setSubmitted(false); setSelectedPrescription(null); setReportForm({ reportType: "reacao_adversa", severity: "leve", description: "" }); }}>Enviar Outro Relato</Button>
     </CardContent></Card>
   );
@@ -194,7 +223,10 @@ function PrescriptionReports({ patientId }: { patientId: number }) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><CardTitle className="text-base">Suas Fórmulas Ativas</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Suas Fórmulas Ativas</CardTitle>
+          <CardDescription className="text-xs">Selecione uma fórmula para reportar sua experiência</CardDescription>
+        </CardHeader>
         <CardContent>
           {activePrescriptions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Nenhuma fórmula ativa no momento</p>
@@ -242,7 +274,9 @@ function PrescriptionReports({ patientId }: { patientId: number }) {
               </div>
             </div>
             <div className="space-y-2"><Label className="text-xs">Descreva o que ocorreu</Label><Textarea value={reportForm.description} onChange={e => setReportForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Ex: Senti queimação no estômago após a 2ª tomada..." /></div>
-            <Button onClick={handleReport} className="w-full" disabled={createReport.isPending}>{createReport.isPending ? "Enviando..." : "Enviar Relato"}</Button>
+            <div className="sticky bottom-4 pt-2">
+              <Button onClick={handleReport} className="w-full shadow-lg" size="lg" disabled={createReport.isPending}>{createReport.isPending ? "Enviando..." : "Enviar Relato"}</Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -250,28 +284,56 @@ function PrescriptionReports({ patientId }: { patientId: number }) {
   );
 }
 
+// ─── Patient Anamnese (V15 5-step flow) ──────────────────────
 function PatientAnamnese({ patientId }: { patientId: number }) {
   const { data: questions } = trpc.question.list.useQuery({ category: "integrativa" });
   const createSession = trpc.anamnesis.createSession.useMutation();
   const saveResponses = trpc.anamnesis.saveResponses.useMutation();
   const completeSession = trpc.anamnesis.completeSession.useMutation();
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(1);
   const [answers, setAnswers] = useState<Record<number, any>>({});
   const [completed, setCompleted] = useState(false);
 
-  const sections = useMemo(() => {
-    if (!questions) return [];
-    const secs: Record<string, any[]> = {};
-    questions.forEach((q: any) => { if (!q.isActive) return; if (!secs[q.section]) secs[q.section] = []; secs[q.section].push(q); });
-    return Object.entries(secs).map(([name, qs]) => ({ name, questions: qs }));
+  // Group questions by V15 step
+  const stepQuestions = useMemo(() => {
+    if (!questions) return {};
+    const grouped: Record<number, any[]> = {};
+    (questions as any[]).filter((q: any) => q.isActive).forEach((q: any) => {
+      const step = q.step ?? 1;
+      if (!grouped[step]) grouped[step] = [];
+      grouped[step].push(q);
+    });
+    Object.values(grouped).forEach(arr => arr.sort((a: any, b: any) => a.sortOrder - b.sortOrder));
+    return grouped;
   }, [questions]);
+
+  const totalSteps = Math.max(...Object.keys(stepQuestions).map(Number), 5);
+  const currentQuestions = stepQuestions[currentStep] ?? [];
+  const progress = (currentStep / totalSteps) * 100;
+  const stepInfo = STEP_LABELS[currentStep] ?? STEP_LABELS[1];
+  const StepIcon = stepInfo.icon;
+
+  // Autosave to localStorage
+  const storageKey = `padcom_portal_draft_${patientId}`;
+  useEffect(() => {
+    if (Object.keys(answers).length > 0) {
+      try { localStorage.setItem(storageKey, JSON.stringify(answers)); } catch {}
+    }
+  }, [answers, storageKey]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) setAnswers(JSON.parse(saved));
+    } catch {}
+  }, [storageKey]);
 
   const startSession = async () => {
     try {
       const result = await createSession.mutateAsync({ patientId, category: "integrativa", conductedByType: "paciente" });
       setSessionId(result.id);
-      setCurrentStep(0);
+      setCurrentStep(1);
     } catch (e: any) { toast.error(e.message); }
   };
 
@@ -280,12 +342,13 @@ function PatientAnamnese({ patientId }: { patientId: number }) {
     try {
       const responses = Object.entries(answers).map(([qId, val]) => ({
         questionId: Number(qId),
-        answerText: typeof val === "string" ? val : undefined,
+        answerText: typeof val === "string" ? val : typeof val === "boolean" ? (val ? "sim" : "nao") : undefined,
         answerNumber: typeof val === "number" ? String(val) : undefined,
-        answerJson: typeof val === "object" ? val : undefined,
+        answerJson: Array.isArray(val) ? val : undefined,
       }));
       await saveResponses.mutateAsync({ sessionId, responses });
       await completeSession.mutateAsync({ sessionId });
+      try { localStorage.removeItem(storageKey); } catch {}
       setCompleted(true);
       toast.success("Anamnese concluída!");
     } catch (e: any) { toast.error(e.message); }
@@ -295,7 +358,7 @@ function PatientAnamnese({ patientId }: { patientId: number }) {
     <Card><CardContent className="p-8 text-center">
       <Check className="h-12 w-12 text-green-600 mx-auto mb-4" />
       <h2 className="text-lg font-semibold mb-2">Anamnese Concluída!</h2>
-      <p className="text-sm text-muted-foreground">Obrigado por preencher. O médico terá acesso às suas respostas.</p>
+      <p className="text-sm text-muted-foreground">Obrigado por preencher. O médico terá acesso às suas respostas na próxima consulta.</p>
     </CardContent></Card>
   );
 
@@ -304,70 +367,126 @@ function PatientAnamnese({ patientId }: { patientId: number }) {
       <CardContent className="p-8 text-center">
         <Stethoscope className="h-12 w-12 text-primary mx-auto mb-4" />
         <h2 className="text-lg font-semibold mb-2">Anamnese Clínica</h2>
-        <p className="text-sm text-muted-foreground mb-4">Preencha o questionário para que o médico tenha acesso ao seu histórico de saúde.</p>
-        {sections.length === 0 ? (
+        <p className="text-sm text-muted-foreground mb-4">Preencha o questionário em 5 etapas para que o médico tenha acesso ao seu histórico de saúde completo.</p>
+        {Object.keys(stepQuestions).length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum questionário disponível no momento.</p>
         ) : (
-          <Button onClick={startSession} disabled={createSession.isPending}>Iniciar Anamnese</Button>
+          <>
+            <Button onClick={startSession} disabled={createSession.isPending} size="lg">Iniciar Anamnese</Button>
+            {Object.keys(answers).length > 0 && (
+              <p className="text-xs text-muted-foreground mt-3">Rascunho salvo com {Object.keys(answers).length} respostas</p>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   );
 
-  const currentSection = sections[currentStep];
-  const progress = sections.length > 0 ? ((currentStep + 1) / sections.length) * 100 : 0;
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Seção {currentStep + 1}/{sections.length}: {currentSection?.name}</p>
-        <Badge variant="outline" className="text-xs">{Math.round(progress)}%</Badge>
+      {/* Step header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <StepIcon className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-sm font-bold">Etapa {currentStep}: {stepInfo.title}</h2>
+          <p className="text-xs text-muted-foreground">{stepInfo.subtitle}</p>
+        </div>
+        <Badge variant="outline" className="text-xs shrink-0">{Math.round(progress)}%</Badge>
       </div>
-      <div className="w-full bg-muted rounded-full h-1.5"><div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
-      <Card><CardContent className="p-5 space-y-5">
-        {currentSection?.questions.map((q: any) => (
-          <PortalQuestionField key={q.id} question={q} value={answers[q.id]} onChange={(v: any) => setAnswers(prev => ({ ...prev, [q.id]: v }))} />
+
+      {/* Progress bar */}
+      <div className="flex gap-1">
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map(step => (
+          <div key={step} className={`h-1.5 flex-1 rounded-full transition-all ${step < currentStep ? "bg-primary" : step === currentStep ? "bg-primary/60" : "bg-muted"}`} />
         ))}
-      </CardContent></Card>
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setCurrentStep(s => s - 1)} disabled={currentStep === 0} className="gap-1"><ChevronLeft className="h-4 w-4" /> Anterior</Button>
-        {currentStep === sections.length - 1 ? (
-          <Button onClick={handleComplete} className="gap-1" disabled={saveResponses.isPending}><Check className="h-4 w-4" /> Concluir</Button>
+      </div>
+
+      {/* Questions */}
+      <Card>
+        <CardContent className="p-5 space-y-5">
+          {currentQuestions.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma pergunta nesta etapa. Avance para a próxima.</p>
+          ) : (
+            currentQuestions.map((q: any) => (
+              <PortalQuestionField key={q.id} question={q} value={answers[q.id]} onChange={(v: any) => setAnswers(prev => ({ ...prev, [q.id]: v }))} />
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Navigation - sticky */}
+      <div className="sticky bottom-4 flex justify-between gap-3">
+        <Button variant="outline" onClick={() => setCurrentStep(s => Math.max(1, s - 1))} disabled={currentStep === 1} className="gap-1 shadow-sm">
+          <ChevronLeft className="h-4 w-4" /> Anterior
+        </Button>
+        {currentStep === totalSteps ? (
+          <Button onClick={handleComplete} className="gap-1 flex-1 shadow-lg" disabled={saveResponses.isPending || completeSession.isPending}>
+            <Check className="h-4 w-4" /> Concluir Anamnese
+          </Button>
         ) : (
-          <Button onClick={() => setCurrentStep(s => s + 1)} className="gap-1">Próxima <ChevronRight className="h-4 w-4" /></Button>
+          <Button onClick={() => setCurrentStep(s => Math.min(totalSteps, s + 1))} className="gap-1 flex-1 shadow-lg">
+            Próxima <ChevronRight className="h-4 w-4" />
+          </Button>
         )}
       </div>
     </div>
   );
 }
 
+// ─── Portal Question Field ───────────────────────────────────
 function PortalQuestionField({ question, value, onChange }: { question: any; value: any; onChange: (v: any) => void }) {
   const q = question;
   return (
-    <div className="space-y-2">
-      <Label className="text-sm">{q.questionText} {q.isRequired && <span className="text-destructive">*</span>}</Label>
-      {q.fieldType === "text" && <Input value={value ?? ""} onChange={e => onChange(e.target.value)} />}
-      {q.fieldType === "textarea" && <Textarea value={value ?? ""} onChange={e => onChange(e.target.value)} rows={3} />}
+    <div className="space-y-2 p-3 rounded-lg border bg-card">
+      <Label className="text-sm font-medium leading-relaxed">
+        {q.questionText} {q.isRequired && <span className="text-destructive">*</span>}
+      </Label>
+      {q.helper && <p className="text-[10px] text-muted-foreground -mt-1">{q.helper}</p>}
+
+      {q.fieldType === "text" && <Input value={value ?? ""} onChange={e => onChange(e.target.value)} placeholder="Digite sua resposta" />}
+      {q.fieldType === "textarea" && <Textarea value={value ?? ""} onChange={e => onChange(e.target.value)} rows={3} placeholder="Descreva em detalhes" />}
       {q.fieldType === "number" && <Input type="number" value={value ?? ""} onChange={e => onChange(Number(e.target.value))} />}
       {q.fieldType === "date" && <Input type="date" value={value ?? ""} onChange={e => onChange(e.target.value)} />}
       {q.fieldType === "scale" && (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pt-1">
           <Slider value={[value ?? q.scaleMin ?? 0]} min={q.scaleMin ?? 0} max={q.scaleMax ?? 10} step={0.5} onValueChange={([v]) => onChange(v)} />
-          <div className="flex justify-between text-xs text-muted-foreground"><span>{q.scaleMin ?? 0}</span><span className="font-bold text-foreground">{value ?? 0}</span><span>{q.scaleMax ?? 10}</span></div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{q.scaleMin ?? 0}</span>
+            <span className="font-bold text-lg text-primary">{value ?? q.scaleMin ?? 0}</span>
+            <span>{q.scaleMax ?? 10}</span>
+          </div>
         </div>
       )}
       {q.fieldType === "select" && (
-        <Select value={value ?? ""} onValueChange={onChange}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+        <Select value={value ?? ""} onValueChange={onChange}>
+          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
           <SelectContent>{(q.options ?? []).map((opt: string, i: number) => (<SelectItem key={i} value={opt}>{opt}</SelectItem>))}</SelectContent>
         </Select>
       )}
       {q.fieldType === "multiselect" && (
-        <div className="space-y-2">{(q.options ?? []).map((opt: string, i: number) => {
-          const selected = Array.isArray(value) ? value : [];
-          return (<div key={i} className="flex items-center gap-2"><Checkbox checked={selected.includes(opt)} onCheckedChange={checked => { onChange(checked ? [...selected, opt] : selected.filter((s: string) => s !== opt)); }} /><span className="text-sm">{opt}</span></div>);
-        })}</div>
+        <div className="grid grid-cols-2 gap-2">
+          {(q.options ?? []).map((opt: string, i: number) => {
+            const selected = Array.isArray(value) ? value : [];
+            const isChecked = selected.includes(opt);
+            return (
+              <label key={i} className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors text-sm ${isChecked ? "border-primary bg-primary/5" : "hover:border-muted-foreground/30"}`}>
+                <Checkbox checked={isChecked} onCheckedChange={checked => {
+                  onChange(checked ? [...selected, opt] : selected.filter((s: string) => s !== opt));
+                }} />
+                {opt}
+              </label>
+            );
+          })}
+        </div>
       )}
-      {q.fieldType === "checkbox" && (<div className="flex items-center gap-2"><Checkbox checked={!!value} onCheckedChange={onChange} /><span className="text-sm">Sim</span></div>)}
+      {q.fieldType === "checkbox" && (
+        <label className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${value ? "border-primary bg-primary/5" : "hover:border-muted-foreground/30"}`}>
+          <Checkbox checked={!!value} onCheckedChange={onChange} />
+          <span className="text-sm font-medium">Sim</span>
+        </label>
+      )}
     </div>
   );
 }

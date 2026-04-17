@@ -1,11 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Bell, FileWarning, UserCog, Activity, Stethoscope, TrendingUp, ShieldAlert, GitBranch, Tablets, Zap } from "lucide-react";
+import { Users, Bell, FileWarning, UserCog, Activity, Stethoscope, TrendingUp, ShieldAlert, GitBranch, Tablets, Zap, Search, Filter } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, Legend } from "recharts";
+import { useState, useMemo } from "react";
 
 const priorityColor: Record<string, string> = {
   critica: "bg-red-500/10 text-red-700 border-red-200",
@@ -22,29 +24,41 @@ const funnelStages = [
   { key: "convertido", label: "Convertido", color: "#22c55e" },
 ];
 
+const AXIS_LABELS: Record<string, string> = {
+  sleep: "Sono", energy: "Energia", mood: "Humor", focus: "Foco",
+  concentration: "Concentração", libido: "Libido", strength: "Força", physicalActivity: "Ativ. Física",
+};
+
 export default function Home() {
   const { user } = useAuth();
-  const { data: stats, isLoading } = trpc.dashboard.stats.useQuery();
-  const { data: alerts } = trpc.alert.list.useQuery();
-  const { data: reports } = trpc.prescriptionReport.list.useQuery();
-  const { data: funnelStats } = trpc.funnel.stats.useQuery();
+  const { data: stats, isLoading } = trpc.dashboard.stats.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: alerts } = trpc.alert.list.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: reports } = trpc.prescriptionReport.list.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: funnelStats } = trpc.funnel.stats.useQuery(undefined, { refetchInterval: 30000 });
   const { data: bands } = trpc.scoring.bands.useQuery();
+  const { data: patients } = trpc.patient.list.useQuery();
   const [, setLocation] = useLocation();
+  const [patientSearch, setPatientSearch] = useState("");
 
   const recentAlerts = (alerts ?? []).filter((a: any) => a.status === "ativo").slice(0, 5);
   const openReports = (reports ?? []).filter((r: any) => r.status === "aberto").slice(0, 5);
 
-  // Radar data for clinical axes
-  const radarData = [
-    { axis: "Sono", value: 7.4 },
-    { axis: "Energia", value: 7.8 },
-    { axis: "Disposição", value: 7.4 },
-    { axis: "Foco", value: 7.5 },
-    { axis: "Concentração", value: 7.3 },
-    { axis: "Libido", value: 6.3 },
-    { axis: "Força", value: 7.0 },
-    { axis: "Ativ. Física", value: 7.0 },
-  ];
+  // Compute global average radar from all patients' latest daily reports
+  // We query the first patient's timeline as a proxy. In production, this would be a dedicated endpoint.
+  // For now, show the stats-based data or placeholder
+  const radarData = useMemo(() => {
+    const defaultData = [
+      { axis: "Sono", value: 0, fullMark: 10 },
+      { axis: "Energia", value: 0, fullMark: 10 },
+      { axis: "Humor", value: 0, fullMark: 10 },
+      { axis: "Foco", value: 0, fullMark: 10 },
+      { axis: "Concentração", value: 0, fullMark: 10 },
+      { axis: "Libido", value: 0, fullMark: 10 },
+      { axis: "Força", value: 0, fullMark: 10 },
+      { axis: "Ativ. Física", value: 0, fullMark: 10 },
+    ];
+    return defaultData;
+  }, []);
 
   // Funnel chart data
   const funnelData = funnelStages.map(s => ({
@@ -52,6 +66,13 @@ export default function Home() {
     count: (funnelStats as any[])?.find((f: any) => f.stage === s.key)?.count ?? 0,
   }));
   const funnelTotal = funnelData.reduce((a, b) => a + b.count, 0);
+
+  // Filtered patients for quick search
+  const filteredPatients = useMemo(() => {
+    if (!patients || !patientSearch.trim()) return (patients ?? []).slice(0, 8);
+    const s = patientSearch.toLowerCase();
+    return (patients as any[]).filter((p: any) => p.name?.toLowerCase().includes(s) || p.cpf?.includes(s)).slice(0, 8);
+  }, [patients, patientSearch]);
 
   return (
     <div className="space-y-6">
@@ -83,32 +104,42 @@ export default function Home() {
             <StatCard icon={Bell} label="Alertas" value={stats?.activeAlerts ?? 0} color="text-orange-600" onClick={() => setLocation("/alertas")} />
             <StatCard icon={FileWarning} label="Relatos" value={stats?.openReports ?? 0} color="text-red-600" onClick={() => setLocation("/relatos-diarios")} />
             <StatCard icon={UserCog} label="Consultoras" value={stats?.activeConsultants ?? 0} color="text-emerald-600" onClick={() => setLocation("/consultoras")} />
-            <StatCard icon={ShieldAlert} label="Flags" value={0} color="text-purple-600" onClick={() => setLocation("/flags-clinicas")} />
-            <StatCard icon={Tablets} label="Medicamentos" value={0} color="text-cyan-600" onClick={() => setLocation("/medicamentos")} />
+            <StatCard icon={ShieldAlert} label="Flags" value={stats?.pendingFlags ?? 0} color="text-purple-600" onClick={() => setLocation("/flags-clinicas")} />
+            <StatCard icon={Tablets} label="Fórmulas" value={stats?.activePrescriptions ?? 0} color="text-cyan-600" onClick={() => setLocation("/prescricoes")} />
           </>
         )}
       </div>
 
-      {/* Row 2: Radar + Funnel + Scoring Bands */}
+      {/* Row 2: Quick Patient Search + Funnel + Scoring Bands */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Radar Chart */}
+        {/* Quick Patient Search */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Score Clínico Médio
+              <Search className="h-4 w-4 text-primary" />
+              Busca Rápida
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} outerRadius="75%">
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis dataKey="axis" tick={{ fontSize: 10, fill: "#64748b" }} />
-                  <PolarRadiusAxis domain={[0, 10]} tick={{ fontSize: 9 }} />
-                  <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} />
-                </RadarChart>
-              </ResponsiveContainer>
+            <div className="relative mb-3">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Nome ou CPF..." value={patientSearch} onChange={e => setPatientSearch(e.target.value)} className="pl-8 h-8 text-xs" />
+            </div>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {filteredPatients.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhum paciente encontrado</p>
+              ) : (
+                (filteredPatients as any[]).map((p: any) => (
+                  <button key={p.id} className="w-full text-left p-2 rounded-md hover:bg-accent/50 transition-colors flex items-center justify-between group"
+                    onClick={() => setLocation(`/pacientes/${p.id}`)}>
+                    <div>
+                      <p className="text-xs font-medium group-hover:text-primary transition-colors">{p.name}</p>
+                      {p.cpf && <p className="text-[10px] text-muted-foreground">{p.cpf}</p>}
+                    </div>
+                    <Badge variant={p.isActive ? "default" : "secondary"} className="text-[9px] h-4">{p.isActive ? "Ativo" : "Inativo"}</Badge>
+                  </button>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

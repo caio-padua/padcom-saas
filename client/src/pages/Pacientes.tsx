@@ -1,12 +1,12 @@
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Phone, Mail, Copy, MessageSquare } from "lucide-react";
+import { Plus, Search, Phone, Mail, Copy, MessageSquare, Filter, X, Users } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -17,29 +17,39 @@ export default function Pacientes() {
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterSex, setFilterSex] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", cpf: "", birthDate: "", sex: "" as string, phone: "", email: "" });
 
   const filtered = useMemo(() => {
     if (!patients) return [];
-    const s = search.toLowerCase();
-    return patients.filter((p: any) => p.name.toLowerCase().includes(s) || p.cpf?.includes(s) || p.email?.toLowerCase().includes(s));
-  }, [patients, search]);
+    let result = patients as any[];
+    // Text search
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      result = result.filter((p: any) => p.name?.toLowerCase().includes(s) || p.cpf?.includes(s) || p.email?.toLowerCase().includes(s) || p.phone?.includes(s));
+    }
+    // Status filter
+    if (filterStatus === "active") result = result.filter((p: any) => p.isActive);
+    else if (filterStatus === "inactive") result = result.filter((p: any) => !p.isActive);
+    // Sex filter
+    if (filterSex !== "all") result = result.filter((p: any) => p.sex === filterSex);
+    return result;
+  }, [patients, search, filterStatus, filterSex]);
+
+  const activeFilters = (filterStatus !== "all" ? 1 : 0) + (filterSex !== "all" ? 1 : 0);
 
   const handleCreate = async () => {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
     try {
-      const result = await createMutation.mutateAsync({
-        ...form,
-        sex: (form.sex || undefined) as any,
-      });
+      await createMutation.mutateAsync({ ...form, sex: (form.sex || undefined) as any });
       toast.success("Paciente cadastrado com sucesso");
       utils.patient.list.invalidate();
       setOpen(false);
       setForm({ name: "", cpf: "", birthDate: "", sex: "", phone: "", email: "" });
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao cadastrar");
-    }
+    } catch (e: any) { toast.error(e.message || "Erro ao cadastrar"); }
   };
 
   const copyLink = (token: string) => {
@@ -55,12 +65,16 @@ export default function Pacientes() {
     window.open(`https://wa.me/55${whatsPhone}?text=${msg}`, "_blank");
   };
 
+  const clearFilters = () => { setFilterStatus("all"); setFilterSex("all"); };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pacientes</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie seus pacientes e gere links de acesso</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filtered.length} paciente{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
+          </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -96,10 +110,55 @@ export default function Pacientes() {
         </Dialog>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nome, CPF ou email..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+      {/* Search + Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por nome, CPF, email ou telefone..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <Button variant="outline" size="sm" className="gap-1.5 h-9" onClick={() => setShowFilters(!showFilters)}>
+          <Filter className="h-3.5 w-3.5" />
+          Filtros
+          {activeFilters > 0 && <Badge variant="default" className="h-4 w-4 p-0 flex items-center justify-center text-[9px]">{activeFilters}</Badge>}
+        </Button>
+        {activeFilters > 0 && (
+          <Button variant="ghost" size="sm" className="h-9 text-xs gap-1 text-muted-foreground" onClick={clearFilters}>
+            <X className="h-3 w-3" /> Limpar
+          </Button>
+        )}
       </div>
+
+      {showFilters && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Sexo</Label>
+                <Select value={filterSex} onValueChange={setFilterSex}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="M">Masculino</SelectItem>
+                    <SelectItem value="F">Feminino</SelectItem>
+                    <SelectItem value="O">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -108,7 +167,15 @@ export default function Pacientes() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <Card><CardContent className="p-12 text-center"><p className="text-muted-foreground">Nenhum paciente encontrado</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">Nenhum paciente encontrado</p>
+            {(search || activeFilters > 0) && (
+              <Button variant="link" className="text-xs mt-2" onClick={() => { setSearch(""); clearFilters(); }}>Limpar busca e filtros</Button>
+            )}
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((p: any) => (
@@ -117,7 +184,10 @@ export default function Pacientes() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="cursor-pointer flex-1" onClick={() => setLocation(`/pacientes/${p.id}`)}>
                     <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</h3>
-                    {p.cpf && <p className="text-xs text-muted-foreground mt-0.5">{p.cpf}</p>}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {p.cpf && <span className="text-xs text-muted-foreground">{p.cpf}</span>}
+                      {p.sex && <Badge variant="outline" className="text-[9px] h-4">{p.sex === "M" ? "Masc" : p.sex === "F" ? "Fem" : "Outro"}</Badge>}
+                    </div>
                   </div>
                   <Badge variant={p.isActive ? "default" : "secondary"} className="text-[10px]">
                     {p.isActive ? "Ativo" : "Inativo"}
@@ -137,7 +207,7 @@ export default function Pacientes() {
                     </Button>
                   )}
                   <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto" onClick={() => setLocation(`/pacientes/${p.id}`)}>
-                    Ver Detalhes
+                    Detalhes
                   </Button>
                 </div>
               </CardContent>
