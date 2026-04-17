@@ -162,8 +162,10 @@
 
 ## PASSO 10 — Multi-clínica e Escalabilidade
 - [ ] Tenancy por slug com branding configurável
-- [ ] Vídeo explicativo por pergunta (campo videoUrl + placeholder)
-- [ ] Recalibragem do motor para absorver novos campos V16
+- [x] Vídeo explicativo por pergunta (campo videoUrl no schema + UI no CRUD de perguntas com expandível)
+- [x] Flag informativa V16 para valores altos em escalas (>80% do máximo)
+- [x] Recalibragem real V16: score por bloco clínico (CARDIO, META, ENDO, DIGEST, NEURO, SONO, ATIV), ponderação por step (1.3/1.5/1.2/0.8/0.5), cálculo de complexidade (baixa/media/alta/muito_alta)
+- [x] 17 testes unitários para scoring-engine V16 (blocos, steps, complexidade, flags, motor actions, bands, raw points)
 - [x] WhatsApp por turno com medicações reais do paciente (filtra por morningQty/afternoonQty/nightQty)
 - [x] Link do portal do paciente incluído na mensagem WhatsApp automaticamente
 
@@ -174,7 +176,7 @@
 - [x] Testes do funil comercial (stats, auth)
 - [x] Testes de flow config (list, update, auth)
 - [x] Testes do dashboard enhanced (patientTimeline, stats)
-- [x] 90 testes passando (5 arquivos de teste)
+- [x] 107 testes passando (6 arquivos de teste)
 
 ## V3 — Páginas Adicionais
 - [x] Página SistemasClinico (visão matricial por 7 sistemas orgânicos)
