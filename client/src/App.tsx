@@ -39,6 +39,7 @@ const Farmacias = lazy(() => import("./pages/Farmacias"));
 const Confianca = lazy(() => import("./pages/Confianca"));
 const WebhooksPage = lazy(() => import("./pages/Webhooks"));
 const ScoreRegulatorio = lazy(() => import("./pages/ScoreRegulatorio"));
+const Exportacao = lazy(() => import("./pages/Exportacao"));
 
 function PageLoader() {
   return (
@@ -82,6 +83,7 @@ function DashboardRouter() {
           <Route path="/confianca" component={Confianca} />
           <Route path="/webhooks" component={WebhooksPage} />
           <Route path="/score-regulatorio" component={ScoreRegulatorio} />
+          <Route path="/exportacao" component={Exportacao} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

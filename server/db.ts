@@ -10,7 +10,8 @@ import {
   entryChannels, entryLeads, pharmacies, prescriptionDispatches,
   validationCascade, professionalTrust, validationConfig,
   conductGrades, webhookEndpoints, recipeDeliveryConfig, quickAnamnesisTemplates,
-  regulatoryCompetence
+  regulatoryCompetence,
+  appointments, internalNotifications, trelloCards, trelloConfig, pwaSyncQueue
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -967,4 +968,155 @@ export async function resolveCompetence(itemId: number, professionalRole: string
     prescriptionType: item.prescriptionType,
     regulatoryScore: item.regulatoryScore,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// V11 — Appointments, Notifications, Trello, PWA Sync
+// ═══════════════════════════════════════════════════════════════
+
+// ─── APPOINTMENTS ─────────────────────────────────────────────
+export async function listAppointments(opts?: { patientId?: number; professionalId?: number; status?: string; clinicId?: number; from?: Date; to?: Date }) {
+  const db = await getDb(); if (!db) return [];
+  let q = db.select().from(appointments).orderBy(desc(appointments.scheduledAt));
+  const conditions: any[] = [];
+  if (opts?.patientId) conditions.push(eq(appointments.patientId, opts.patientId));
+  if (opts?.clinicId) conditions.push(eq(appointments.clinicId, opts.clinicId));
+  if (opts?.status) conditions.push(eq(appointments.status, opts.status as any));
+  if (conditions.length) q = q.where(and(...conditions)) as any;
+  return q;
+}
+
+export async function getAppointment(id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(appointments).where(eq(appointments.id, id));
+  return rows[0] ?? null;
+}
+
+export async function createAppointment(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(appointments).values(data);
+  return result.insertId;
+}
+
+export async function updateAppointment(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(appointments).set(data).where(eq(appointments.id, id));
+}
+
+export async function deleteAppointment(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(appointments).where(eq(appointments.id, id));
+}
+
+// ─── INTERNAL NOTIFICATIONS ───────────────────────────────────
+export async function listNotifications(opts?: { recipientId?: number; isRead?: boolean; type?: string; clinicId?: number; limit?: number }) {
+  const db = await getDb(); if (!db) return [];
+  let q = db.select().from(internalNotifications).orderBy(desc(internalNotifications.createdAt));
+  const conditions: any[] = [];
+  if (opts?.recipientId) conditions.push(eq(internalNotifications.recipientId, opts.recipientId));
+  if (opts?.isRead !== undefined) conditions.push(eq(internalNotifications.isRead, opts.isRead));
+  if (opts?.clinicId) conditions.push(eq(internalNotifications.clinicId, opts.clinicId));
+  if (opts?.type) conditions.push(eq(internalNotifications.type, opts.type as any));
+  if (conditions.length) q = q.where(and(...conditions)) as any;
+  if (opts?.limit) q = q.limit(opts.limit) as any;
+  return q;
+}
+
+export async function createNotification(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(internalNotifications).values(data);
+  return result.insertId;
+}
+
+export async function markNotificationRead(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(internalNotifications).set({ isRead: true, readAt: new Date() }).where(eq(internalNotifications.id, id));
+}
+
+export async function markAllNotificationsRead(recipientId: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(internalNotifications).set({ isRead: true, readAt: new Date() }).where(
+    and(eq(internalNotifications.recipientId, recipientId), eq(internalNotifications.isRead, false))
+  );
+}
+
+export async function getUnreadCount(recipientId: number) {
+  const db = await getDb(); if (!db) return 0;
+  const rows = await db.select().from(internalNotifications).where(
+    and(eq(internalNotifications.recipientId, recipientId), eq(internalNotifications.isRead, false))
+  );
+  return rows.length;
+}
+
+// ─── TRELLO CARDS ─────────────────────────────────────────────
+export async function listTrelloCards(opts?: { entityType?: string; syncStatus?: string; clinicId?: number }) {
+  const db = await getDb(); if (!db) return [];
+  let q = db.select().from(trelloCards).orderBy(desc(trelloCards.createdAt));
+  const conditions: any[] = [];
+  if (opts?.entityType) conditions.push(eq(trelloCards.entityType, opts.entityType as any));
+  if (opts?.syncStatus) conditions.push(eq(trelloCards.syncStatus, opts.syncStatus as any));
+  if (opts?.clinicId) conditions.push(eq(trelloCards.clinicId, opts.clinicId));
+  if (conditions.length) q = q.where(and(...conditions)) as any;
+  return q;
+}
+
+export async function createTrelloCard(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(trelloCards).values(data);
+  return result.insertId;
+}
+
+export async function updateTrelloCard(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(trelloCards).set(data).where(eq(trelloCards.id, id));
+}
+
+// ─── TRELLO CONFIG ────────────────────────────────────────────
+export async function getTrelloConfig(clinicId?: number) {
+  const db = await getDb(); if (!db) return null;
+  const conditions: any[] = [];
+  if (clinicId) conditions.push(eq(trelloConfig.clinicId, clinicId));
+  const rows = conditions.length
+    ? await db.select().from(trelloConfig).where(and(...conditions))
+    : await db.select().from(trelloConfig);
+  return rows[0] ?? null;
+}
+
+export async function upsertTrelloConfig(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const existing = await getTrelloConfig(data.clinicId);
+  if (existing) {
+    await db.update(trelloConfig).set(data).where(eq(trelloConfig.id, existing.id));
+    return existing.id;
+  }
+  const [result] = await db.insert(trelloConfig).values(data);
+  return result.insertId;
+}
+
+// ─── PWA SYNC QUEUE ───────────────────────────────────────────
+export async function listPwaSyncQueue(opts?: { status?: string; patientId?: number; clinicId?: number }) {
+  const db = await getDb(); if (!db) return [];
+  let q = db.select().from(pwaSyncQueue).orderBy(desc(pwaSyncQueue.createdAt));
+  const conditions: any[] = [];
+  if (opts?.status) conditions.push(eq(pwaSyncQueue.status, opts.status as any));
+  if (opts?.patientId) conditions.push(eq(pwaSyncQueue.patientId, opts.patientId));
+  if (opts?.clinicId) conditions.push(eq(pwaSyncQueue.clinicId, opts.clinicId));
+  if (conditions.length) q = q.where(and(...conditions)) as any;
+  return q;
+}
+
+export async function createPwaSyncEntry(data: any) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(pwaSyncQueue).values(data);
+  return result.insertId;
+}
+
+export async function updatePwaSyncEntry(id: number, data: any) {
+  const db = await getDb(); if (!db) return;
+  await db.update(pwaSyncQueue).set(data).where(eq(pwaSyncQueue.id, id));
+}
+
+export async function processPwaSyncEntry(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(pwaSyncQueue).set({ status: "sincronizado" as any, resolvedAt: new Date() }).where(eq(pwaSyncQueue.id, id));
 }

@@ -301,3 +301,21 @@
 - [x] Varredura completa: Pacientes, Consultoras, Prescrições, Exames, Sessões, Alertas, RelatosDiarios, Clínicas, Governança, Farmácias, Confiança, Webhooks, ScoreRegulatorio, Medicamentos, MotorAcoes, FlagsClinicas, ConfigFluxo, SistemasClinico, FilaEquipe, Funil, Polifarmacia, Protocolos, Auditoria, Evolução, Perguntas
 - [x] Cada campo: Label font-semibold + text-xs text-muted-foreground abaixo
 - [x] Página Score Competência Reguladora com CRUD completo + motor de resolução
+
+## ═══════════════════════════════════════════════════════════
+## V11 — MANUS-PADCOM BUNDLE PARA TRANSPLANTE (Dr. Replit)
+## ═══════════════════════════════════════════════════════════
+
+- [x] MANIFESTO.md — mensagem de humildade e protocolo de colaboração Manus→Replit
+- [x] 6 schemas Drizzle PT-BR (pgTable): questionarios, sessoes, respostas, bandas, alertas, auditoria
+- [x] 1 arquivo de rotas REST Express (padcom.ts) com CRUD completo + motor scoring
+- [x] 5 páginas React: paciente, concluido, admin, admin-detalhe, admin-dashboard (Recharts)
+- [x] 3 seeds SQL idempotentes: 34 perguntas, 4 bandas, 8 regras de alerta
+- [x] 3 diffs incrementais para schema/index.ts, routes/index.ts, App.tsx
+- [x] curl-tests.sh para testar todos os endpoints
+- [x] README.md com passo-a-passo de aplicação
+- [x] DIFF.md com lista de arquivos novos vs modificados + verificação de não-colisão
+- [x] RISCOS.md com 12 riscos identificados + mitigações + plano de contingência
+- [x] KAIZEN.md com 6 melhorias implementadas + 13 melhorias propostas para avaliação
+- [x] Compliance 12/12 regras de ouro do HANDOFF verificado automaticamente
+- [x] Bundle copiado para padcom-saas/manus-padcom-bundle/ para push via GitHub

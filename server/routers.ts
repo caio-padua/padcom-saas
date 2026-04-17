@@ -15,6 +15,8 @@ import {
   conductGradeRouter, webhookEndpointRouter, webhookIntakeRouter,
   recipeDeliveryRouter, quickAnamnesisRouter, regulatoryCompetenceRouter
 } from "./routers-v10-1";
+import { exportRouter } from "./routers-export";
+import { appointmentRouter, notificationRouter, trelloRouter, pwaSyncRouter } from "./routers-v11";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito ao administrador" });
@@ -845,6 +847,13 @@ export const appRouter = router({
   recipeDelivery: recipeDeliveryRouter,
   quickAnamnesis: quickAnamnesisRouter,
   regulatoryCompetence: regulatoryCompetenceRouter,
+  // V11 — Exportação CSV
+  export: exportRouter,
+  // V11 — Agendamento, Notificações, Trello, PWA
+  appointment: appointmentRouter,
+  notification: notificationRouter,
+  trello: trelloRouter,
+  pwaSync: pwaSyncRouter,
 });
 
 export type AppRouter = typeof appRouter;

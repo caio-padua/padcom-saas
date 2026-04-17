@@ -26,7 +26,7 @@ import {
   FileHeart, Pill, Bell, Settings, LogOut, PanelLeft, Activity,
   UserCog, FlaskConical, CalendarCheck, TrendingUp, ShieldAlert,
   Tablets, GitBranch, Heart, ListTodo, FileText, AlertTriangle,
-  Building2, Cog, Filter, BarChart3, Store, ShieldCheck, Webhook, Scale
+  Building2, Cog, Filter, BarChart3, Store, ShieldCheck, Webhook, Scale, FileSpreadsheet
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -61,6 +61,7 @@ const menuItems = [
   { icon: ShieldCheck, label: "Confiança", path: "/confianca" },
   { icon: Webhook, label: "Webhooks", path: "/webhooks" },
   { icon: Scale, label: "Score Regulatório", path: "/score-regulatorio" },
+  { icon: FileSpreadsheet, label: "Exportação CSV", path: "/exportacao" },
   { icon: Activity, label: "Auditoria", path: "/auditoria" },
 ];
 

@@ -839,3 +839,151 @@ export const regulatoryCompetence = mysqlTable("regulatory_competence", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 export type RegulatoryCompetenceEntry = typeof regulatoryCompetence.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════
+// V11 — Agendamento, Notificações, Trello, PWA Sync
+// Alias Núcleo: agendamentos, notificacoes_internas, cards_trello, fila_sync_offline
+// ═══════════════════════════════════════════════════════════════
+
+// ─── APPOINTMENTS (Agendamento de Consultas) ──────────────────
+export const appointments = mysqlTable("appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patientId").notNull(),
+  patientName: varchar("patientName", { length: 255 }),
+  professionalId: int("professionalId"),
+  professionalName: varchar("professionalName", { length: 255 }),
+  type: mysqlEnum("type", [
+    "consulta_integrativa", "consulta_estetica", "retorno",
+    "anamnese", "procedimento", "exame", "acompanhamento",
+  ]).default("consulta_integrativa").notNull(),
+  status: mysqlEnum("status", [
+    "agendado", "confirmado", "em_atendimento", "concluido",
+    "cancelado", "no_show", "reagendado",
+  ]).default("agendado").notNull(),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  durationMinutes: int("durationMinutes").default(30),
+  location: varchar("location", { length: 500 }),
+  notes: text("notes"),
+  // Integração com calendário externo
+  externalCalendarId: varchar("externalCalendarId", { length: 255 }),
+  externalCalendarProvider: mysqlEnum("externalCalendarProvider", [
+    "google", "outlook", "ical", "manual",
+  ]).default("manual"),
+  // Lembrete
+  reminderSentAt: timestamp("reminderSentAt"),
+  reminderType: mysqlEnum("reminderType", ["email", "whatsapp", "sms", "push", "nenhum"]).default("nenhum"),
+  // Recorrência
+  isRecurring: boolean("isRecurring").default(false),
+  recurrenceRule: varchar("recurrenceRule", { length: 255 }),
+  parentAppointmentId: int("parentAppointmentId"),
+  // Multi-tenant
+  clinicId: int("clinicId"),
+  entryLeadId: int("entryLeadId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Appointment = typeof appointments.$inferSelect;
+
+// ─── INTERNAL NOTIFICATIONS ───────────────────────────────────
+export const internalNotifications = mysqlTable("internal_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  recipientId: int("recipientId").notNull(),
+  recipientType: mysqlEnum("recipientType", [
+    "admin", "medico", "enfermeiro", "consultora", "paciente",
+  ]).default("admin").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content"),
+  type: mysqlEnum("type", [
+    "alerta_clinico", "prescricao_pendente", "validacao_pendente",
+    "despacho_atualizado", "agendamento", "lead_novo", "sistema",
+    "lembrete", "resultado_exame",
+  ]).default("sistema").notNull(),
+  priority: mysqlEnum("priority", ["baixa", "normal", "alta", "urgente"]).default("normal").notNull(),
+  // Referência à entidade que gerou a notificação
+  entityType: varchar("entityType", { length: 100 }),
+  entityId: int("entityId"),
+  // Status
+  isRead: boolean("isRead").default(false).notNull(),
+  readAt: timestamp("readAt"),
+  // Canal de envio
+  channel: mysqlEnum("channel", ["interno", "email", "whatsapp", "push"]).default("interno").notNull(),
+  sentAt: timestamp("sentAt"),
+  // Multi-tenant
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InternalNotification = typeof internalNotifications.$inferSelect;
+
+// ─── TRELLO CARDS (Integração com Trello) ─────────────────────
+export const trelloCards = mysqlTable("trello_cards", {
+  id: int("id").autoincrement().primaryKey(),
+  // Referência interna
+  entityType: mysqlEnum("entityType", [
+    "alerta", "prescricao", "validacao", "lead", "agendamento", "despacho",
+  ]).notNull(),
+  entityId: int("entityId").notNull(),
+  // Dados do card no Trello
+  trelloCardId: varchar("trelloCardId", { length: 100 }),
+  trelloBoardId: varchar("trelloBoardId", { length: 100 }),
+  trelloListId: varchar("trelloListId", { length: 100 }),
+  trelloUrl: varchar("trelloUrl", { length: 500 }),
+  // Conteúdo
+  cardTitle: varchar("cardTitle", { length: 500 }).notNull(),
+  cardDescription: text("cardDescription"),
+  labels: text("labels"), // JSON array of label names
+  dueDate: timestamp("dueDate"),
+  // Sync status
+  syncStatus: mysqlEnum("syncStatus", [
+    "pendente", "sincronizado", "erro", "arquivado",
+  ]).default("pendente").notNull(),
+  lastSyncAt: timestamp("lastSyncAt"),
+  syncError: text("syncError"),
+  // Multi-tenant
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type TrelloCard = typeof trelloCards.$inferSelect;
+
+// ─── TRELLO CONFIG ────────────────────────────────────────────
+export const trelloConfig = mysqlTable("trello_config", {
+  id: int("id").autoincrement().primaryKey(),
+  apiKey: varchar("apiKey", { length: 255 }),
+  apiToken: varchar("apiToken", { length: 500 }),
+  defaultBoardId: varchar("defaultBoardId", { length: 100 }),
+  // Mapeamento de listas por tipo de entidade
+  listMappings: text("listMappings"), // JSON: { "alerta": "listId", "prescricao": "listId" }
+  isActive: boolean("isActive").default(false).notNull(),
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type TrelloConfig = typeof trelloConfig.$inferSelect;
+
+// ─── PWA SYNC QUEUE (Fila de sincronização offline) ───────────
+export const pwaSyncQueue = mysqlTable("pwa_sync_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  // Quem gerou
+  userId: int("userId"),
+  patientId: int("patientId"),
+  // Tipo de operação
+  operationType: mysqlEnum("operationType", [
+    "relato_diario", "resposta_anamnese", "agendamento", "atualizacao_dados",
+  ]).notNull(),
+  // Payload JSON com os dados a sincronizar
+  payload: text("payload").notNull(),
+  // Status
+  status: mysqlEnum("status", [
+    "pendente", "sincronizando", "sincronizado", "erro", "conflito",
+  ]).default("pendente").notNull(),
+  // Metadados
+  deviceId: varchar("deviceId", { length: 255 }),
+  offlineCreatedAt: timestamp("offlineCreatedAt"),
+  syncAttempts: int("syncAttempts").default(0),
+  lastSyncError: text("lastSyncError"),
+  resolvedAt: timestamp("resolvedAt"),
+  // Multi-tenant
+  clinicId: int("clinicId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PwaSyncQueueEntry = typeof pwaSyncQueue.$inferSelect;
